@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
+import type { ProjectStatus } from "@/components/common/projects/ProjectTable";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
@@ -10,6 +11,7 @@ export type ProjectFormValues = {
   description: string;
   startDate: string;
   endDate: string;
+  status: ProjectStatus;
 };
 
 type Props = {
@@ -20,6 +22,11 @@ type Props = {
 
 type FormErrors = Partial<Record<keyof ProjectFormValues, string>>;
 const MAX_TEXT_LENGTH = 15;
+const PROJECT_STATUSES: ProjectStatus[] = [
+  "Planned",
+  "In Progress",
+  "Completed",
+];
 
 export default function ProjectForm({
   initialValues,
@@ -31,6 +38,7 @@ export default function ProjectForm({
     description: "",
     startDate: "",
     endDate: "",
+    status: "Planned",
   };
 
   const [form, setForm] = useState<ProjectFormValues>(
@@ -60,6 +68,7 @@ export default function ProjectForm({
 
     if (!form.startDate) nextErrors.startDate = "Start date is required";
     if (!form.endDate) nextErrors.endDate = "End date is required";
+    if (!form.status) nextErrors.status = "Status is required";
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -149,6 +158,29 @@ export default function ProjectForm({
             />
             {errors.endDate ? (
               <p className="text-xs text-red-500">{errors.endDate}</p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1.5 md:col-span-2">
+            <label htmlFor="status" className="ui-caption">
+              Status
+            </label>
+            <select
+              id="status"
+              value={form.status}
+              onChange={(e) =>
+                setForm({ ...form, status: e.target.value as ProjectStatus })
+              }
+              className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-cs-primary-100/30 focus-visible:outline-none"
+            >
+              {PROJECT_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+            {errors.status ? (
+              <p className="text-xs text-red-500">{errors.status}</p>
             ) : null}
           </div>
         </div>

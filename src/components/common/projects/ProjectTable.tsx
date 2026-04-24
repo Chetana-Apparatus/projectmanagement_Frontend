@@ -7,12 +7,15 @@ import DataTable, {
 } from "@/components/common/table/DataTable";
 import Button from "@/components/ui/Button";
 
+export type ProjectStatus = "Planned" | "In Progress" | "Completed";
+
 export type Project = {
   id: string;
   name: string;
   description: string;
   startDate: string;
   endDate: string;
+  status: ProjectStatus;
 };
 
 type Props = {
@@ -38,6 +41,7 @@ export default function ProjectTable({ projects, onEdit, onDelete }: Props) {
     { label: "Description", key: "description" },
     { label: "Start Date", key: "startDate" },
     { label: "End Date", key: "endDate" },
+    { label: "Status", key: "status" },
     { label: "Actions", key: "actions" },
   ];
 
@@ -63,6 +67,21 @@ export default function ProjectTable({ projects, onEdit, onDelete }: Props) {
                   </button>
                 ) : null}
               </div>
+            );
+          },
+          status: (row) => {
+            const statusStyles: Record<ProjectStatus, string> = {
+              Planned: "bg-gray-100 text-gray-700",
+              "In Progress": "bg-blue-100 text-blue-700",
+              Completed: "bg-emerald-100 text-emerald-700",
+            };
+
+            return (
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[row.status]}`}
+              >
+                {row.status}
+              </span>
             );
           },
           actions: (row) => (

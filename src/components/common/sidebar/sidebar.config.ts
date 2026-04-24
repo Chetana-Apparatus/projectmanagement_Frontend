@@ -37,9 +37,24 @@ export const SIDEBAR_ITEMS: Record<UserRole, SidebarItem[]> = {
   BA: [
     { label: "Dashboard", href: "/business-analyst", icon: LayoutDashboard },
     {
-      label: "Projects",
+      label: "Project Management",
       href: "/business-analyst/projects",
       icon: FolderKanban,
+    },
+    {
+      label: "Milestone Management",
+      href: "/business-analyst/milestones",
+      icon: Milestone,
+    },
+    {
+      label: "Task Management",
+      href: "/business-analyst/tasks",
+      icon: CheckSquare,
+    },
+    {
+      label: "Work Tracking",
+      href: "/business-analyst/work-tracking",
+      icon: Timer,
     },
     { label: "Documents", href: "/business-analyst/documents", icon: FileText },
   ],

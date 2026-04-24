@@ -39,8 +39,8 @@ export default function MilestoneTable({
     { label: "Start Date", key: "startDate" },
     { label: "End Date", key: "endDate" },
     { label: "Deadline", key: "deadline" },
-    { label: "Assigned Employees", key: "assignedEmployees" },
-    { label: "Watchers", key: "watchers" },
+    // { label: "Assigned Employees", key: "assignedEmployees" },
+    // { label: "Watchers", key: "watchers" },
     { label: "Actions", key: "actions" },
   ];
 
