@@ -3,9 +3,9 @@ import {
   Briefcase,
   CheckSquare,
   ClipboardList,
-  FileText,
   FolderKanban,
   LayoutDashboard,
+  MessageSquare,
   Milestone,
   Settings,
   Timer,
@@ -31,7 +31,7 @@ export const SIDEBAR_ITEMS: Record<UserRole, SidebarItem[]> = {
     { label: "Milestones", href: "/admin/milestones", icon: Milestone },
     { label: "Tasks", href: "/admin/tasks", icon: CheckSquare },
     { label: "Work Tracking", href: "/admin/work-tracking", icon: Timer },
-    { label: "Documents", href: "/admin/documents", icon: FileText },
+    { label: "AI Chat", href: "/admin/ai-chat", icon: MessageSquare },
     { label: "Settings", href: "/admin/settings", icon: Settings },
   ],
   BA: [
@@ -56,7 +56,6 @@ export const SIDEBAR_ITEMS: Record<UserRole, SidebarItem[]> = {
       href: "/business-analyst/work-tracking",
       icon: Timer,
     },
-    { label: "Documents", href: "/business-analyst/documents", icon: FileText },
   ],
   Employee: [
     { label: "Dashboard", href: "/employee", icon: LayoutDashboard },

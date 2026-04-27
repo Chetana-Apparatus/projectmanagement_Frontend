@@ -1,11 +1,8 @@
 "use client";
 
-import { Progress } from "antd";
+import { Progress, Table, type TableColumnsType } from "antd";
 import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
-import DataTable, {
-  type DataTableColumn,
-} from "@/components/common/table/DataTable";
 import { calculateProgress, getProgressColor } from "@/utils/progress";
 
 type WorkLog = {
@@ -156,10 +153,9 @@ const mockLogs: WorkLog[] = [
   },
 ];
 
-export default function AdminWorkTrackingPage() {
+export default function BAWorkTrackingPage() {
   const [logs, setLogs] = useState<WorkLog[]>(mockLogs);
 
-  // ⏱ AUTO + DELAY LOGIC
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
@@ -171,12 +167,10 @@ export default function AdminWorkTrackingPage() {
             const diffHours =
               (now.getTime() - start.getTime()) / (1000 * 60 * 60);
 
-            // ⚠️ Delayed after 2 hrs
             if (diffHours >= 2 && diffHours < 4) {
               return { ...log, status: "delayed" };
             }
 
-            // ⛔ Auto-stop after 4 hrs
             if (diffHours >= 4) {
               console.log(`AUTO STOP + EMAIL → ${log.employee}`);
 
@@ -195,21 +189,65 @@ export default function AdminWorkTrackingPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // 📊 TABLE COLUMNS (NO ACTION COLUMN)
-  const columns: DataTableColumn[] = [
-    { label: "Employee", key: "employee" },
-    { label: "Project", key: "project" },
-    { label: "Milestone", key: "milestone" },
-    { label: "Task", key: "task" },
-    { label: "Progress", key: "progress" },
-    { label: "Status", key: "status" },
-    { label: "Start Time", key: "startTime" },
-    { label: "Total Time", key: "totalTime" },
+  const columns: TableColumnsType<WorkLog> = [
+    { title: "EMPLOYEE", dataIndex: "employee", key: "employee" },
+    { title: "PROJECT", dataIndex: "project", key: "project" },
+    { title: "MILESTONE", dataIndex: "milestone", key: "milestone" },
+    { title: "TASK", dataIndex: "task", key: "task" },
+    {
+      title: "PROGRESS",
+      key: "progress",
+      render: (_, row) => {
+        const percent = calculateProgress(row.startDate, row.endDate);
+
+        return (
+          <div className="min-w-[140px] max-w-[180px]">
+            <Progress
+              percent={percent}
+              strokeColor={getProgressColor(percent)}
+              size="small"
+              format={(value) => `${value ?? 0}%`}
+            />
+          </div>
+        );
+      },
+    },
+    {
+      title: "STATUS",
+      dataIndex: "status",
+      key: "status",
+      render: (status: WorkLog["status"]) => {
+        const styles = {
+          running: "bg-green-100 text-green-600",
+          paused: "bg-yellow-100 text-yellow-600",
+          stopped: "bg-gray-100 text-gray-600",
+          delayed: "bg-orange-100 text-orange-600",
+          "auto-stopped": "bg-red-100 text-red-600",
+        };
+
+        const labels = {
+          running: "Running",
+          paused: "Paused",
+          stopped: "Stopped",
+          delayed: "Delayed",
+          "auto-stopped": "Auto-Stopped",
+        };
+
+        return (
+          <span
+            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs ${styles[status]}`}
+          >
+            {labels[status]}
+          </span>
+        );
+      },
+    },
+    { title: "START TIME", dataIndex: "startTime", key: "startTime" },
+    { title: "TOTAL TIME", dataIndex: "totalTime", key: "totalTime" },
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      {/* HEADER */}
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="ui-page-title">Work Tracking</h1>
         <p className="ui-body-muted">
@@ -217,8 +255,7 @@ export default function AdminWorkTrackingPage() {
         </p>
       </div>
 
-      {/* CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4 !flex-row !items-center !justify-between">
           <p className="text-gray-500">Active Employees</p>
           <h2 className="text-xl font-bold text-green-600">
@@ -248,59 +285,13 @@ export default function AdminWorkTrackingPage() {
         </Card>
       </div>
 
-      {/* TABLE */}
-      <DataTable<WorkLog>
+      <Table<WorkLog>
+        rowKey="id"
         columns={columns}
-        data={logs}
-        renderers={{
-          project: (row) => (
-            <span className="inline-block whitespace-nowrap">
-              {row.project}
-            </span>
-          ),
-          task: (row) => (
-            <span className="inline-block whitespace-nowrap">{row.task}</span>
-          ),
-          progress: (row) => {
-            const percent = calculateProgress(row.startDate, row.endDate);
-
-            return (
-              <div className="min-w-[140px] max-w-[180px]">
-                <Progress
-                  percent={percent}
-                  strokeColor={getProgressColor(percent)}
-                  size="small"
-                  format={(value) => `${value ?? 0}%`}
-                />
-              </div>
-            );
-          },
-          status: (row) => {
-            const styles = {
-              running: "bg-green-100 text-green-600",
-              paused: "bg-yellow-100 text-yellow-600",
-              stopped: "bg-gray-100 text-gray-600",
-              delayed: "bg-orange-100 text-orange-600",
-              "auto-stopped": "bg-red-100 text-red-600",
-            };
-
-            const labels = {
-              running: "Running",
-              paused: "Paused",
-              stopped: "Stopped",
-              delayed: "Delayed",
-              "auto-stopped": "Auto-Stopped",
-            };
-
-            return (
-              <span
-                className={`inline-flex whitespace-nowrap px-2 py-1 text-xs rounded-full ${styles[row.status]}`}
-              >
-                {labels[row.status]}
-              </span>
-            );
-          },
-        }}
+        dataSource={logs}
+        bordered
+        pagination={{ pageSize: 5, showSizeChanger: false }}
+        scroll={{ x: 1100 }}
       />
     </div>
   );

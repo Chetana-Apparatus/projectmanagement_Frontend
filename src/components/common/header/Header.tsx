@@ -19,16 +19,19 @@ const roleLabel: Record<UserRole, string> = {
   Employee: "Employee",
 };
 
-const Header = ({ role, onToggleMobileSidebar }: HeaderProps) => {
+const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
   const USER_NAME_KEY = "userName";
   const USER_AVATAR_KEY = "userAvatar";
+
   const [open, setOpen] = useState(false);
   const [userName, setUserName] = useState("John Doe");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+
   const menuRef = useRef<HTMLDivElement>(null);
   const logout = useLogout();
   const router = useRouter();
 
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -40,10 +43,11 @@ const Header = ({ role, onToggleMobileSidebar }: HeaderProps) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sync user data
   useEffect(() => {
     const syncUserProfile = () => {
-      const storedName = window.localStorage.getItem(USER_NAME_KEY);
-      const storedAvatar = window.localStorage.getItem(USER_AVATAR_KEY);
+      const storedName = localStorage.getItem(USER_NAME_KEY);
+      const storedAvatar = localStorage.getItem(USER_AVATAR_KEY);
 
       setUserName(storedName?.trim() || "John Doe");
       setUserAvatar(storedAvatar || null);
@@ -58,83 +62,91 @@ const Header = ({ role, onToggleMobileSidebar }: HeaderProps) => {
   }, []);
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-white px-4 transition-all duration-300 lg:left-[var(--sidebar-width)] lg:px-6">
-      <div className="flex items-center gap-3">
+    <header
+      className={`
+        fixed top-0 right-0 z-20 flex h-16 items-center justify-between
+        border-b border-border bg-white px-4 lg:px-5
+        transition-all duration-300
+        ${collapsed ? "lg:left-[80px]" : "lg:left-[240px]"}
+      `}
+    >
+      {/* LEFT SECTION */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
           className="inline-flex rounded-md p-2 text-cs-text hover:bg-cs-primary-100/10 lg:hidden"
           onClick={onToggleMobileSidebar}
-          aria-label="Open sidebar"
         >
           <Menu size={18} />
         </button>
-        {/* <div className="h-8 w-8 rounded-md bg-cs-primary-100/30 ring-1 ring-cs-primary-100/40" />
-        <span className="text-sm font-semibold text-cs-heading">Apparatus Portal</span> */}
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* RIGHT SECTION */}
+      <div className="flex items-center gap-2 pr-1">
+        {/* Notification */}
         <button
           type="button"
-          className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-cs-text hover:bg-cs-primary-100/10"
-          aria-label="Open notifications"
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg hover:bg-cs-primary-100/10"
         >
-          <Bell size={18} />
-          <span
-            className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500"
-            aria-hidden
-          />
+          <Bell size={17} />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
         </button>
 
+        {/* Profile */}
         <div className="relative" ref={menuRef}>
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
-            className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-cs-primary-100/10"
-            aria-label="Open profile menu"
+            className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-cs-primary-100/10"
           >
-            <div className="h-9 w-9 rounded-full bg-cs-primary-100/30 ring-1 ring-cs-primary-100/40 overflow-hidden flex items-center justify-center">
+            {/* Avatar */}
+            <div className="h-8 w-8 rounded-full bg-cs-primary-100/30 overflow-hidden flex items-center justify-center">
               {userAvatar ? (
                 <Image
                   src={userAvatar}
                   alt={userName}
-                  width={36}
-                  height={36}
-                  className="h-9 w-9 rounded-full object-cover"
+                  width={32}
+                  height={32}
+                  className="rounded-full object-cover"
                 />
               ) : (
-                <User size={16} className="text-cs-text" />
+                <User size={14} />
               )}
             </div>
-            <div className="hidden text-left sm:block">
-              <p className="font-heading  font-semibold text-cs-heading">
+
+            {/* Name + Role */}
+            <div className="hidden sm:flex flex-col leading-none">
+              <p className="text-sm font-semibold text-cs-heading whitespace-nowrap">
                 {userName}
               </p>
-              <p className="p1!tracking-normal !leading-normal">
+              <p className="text-[11px] text-cs-text mt-[2px] whitespace-nowrap">
                 {roleLabel[role]}
               </p>
             </div>
           </button>
 
+          {/* Dropdown */}
           {open && (
             <div className="absolute right-0 mt-2 w-44 rounded-lg border border-border bg-white p-1 shadow-lg">
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-cs-text hover:bg-cs-primary-100/10"
                 onClick={() => {
                   setOpen(false);
                   router.push("/admin/settings");
                 }}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-cs-primary-100/10"
               >
                 <User size={16} />
-                <span className="font-medium">Profile</span>
+                Profile
               </button>
+
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-500 hover:bg-red-50"
                 onClick={logout}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-500 hover:bg-red-50"
               >
                 <LogOut size={14} />
-                <span className="font-medium">Logout</span>
+                Logout
               </button>
             </div>
           )}

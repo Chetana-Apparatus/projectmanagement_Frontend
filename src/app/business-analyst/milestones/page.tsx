@@ -1,16 +1,16 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { Progress, Table, type TableColumnsType } from "antd";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import MilestoneForm, {
   type MilestoneFormValues,
   type SelectOption,
 } from "@/components/common/milestones/MilestoneForm";
-import MilestoneTable, {
-  type MilestoneRecord,
-} from "@/components/common/milestones/MilestoneTable";
+import type { MilestoneRecord } from "@/components/common/milestones/MilestoneTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import { calculateProgress, getProgressColor } from "@/utils/progress";
 
 const projects: SelectOption[] = [
   { id: "prj-101", label: "Project Atlas" },
@@ -41,7 +41,7 @@ const seededMilestones: MilestoneRecord[] = [
   },
 ];
 
-export default function AdminMilestonesPage() {
+export default function BAMilestonesPage() {
   const { showToast } = useToast();
   const [milestones, setMilestones] =
     useState<MilestoneRecord[]>(seededMilestones);
@@ -61,6 +61,64 @@ export default function AdminMilestonesPage() {
       }, {}),
     [],
   );
+  const columns: TableColumnsType<MilestoneRecord> = [
+    {
+      title: "PROJECT NAME",
+      dataIndex: "projectId",
+      key: "projectId",
+      render: (projectId: string) => projectNameMap[projectId] ?? projectId,
+    },
+    { title: "MILESTONE NAME", dataIndex: "name", key: "name" },
+    { title: "START DATE", dataIndex: "startDate", key: "startDate" },
+    { title: "END DATE", dataIndex: "endDate", key: "endDate" },
+    {
+      title: "PROGRESS",
+      key: "progress",
+      render: (_, row) => {
+        const percent = calculateProgress(row.startDate, row.endDate);
+        return (
+          <div className="min-w-[140px] max-w-[180px]">
+            <Progress
+              percent={percent}
+              strokeColor={getProgressColor(percent)}
+              size="small"
+              format={(value) => `${value ?? 0}%`}
+            />
+          </div>
+        );
+      },
+    },
+    {
+      title: "ACTIONS",
+      key: "actions",
+      align: "right",
+      render: (_, row) => (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="flex h-8 w-8 items-center justify-center border-sky-200 text-sky-600 hover:border-sky-200 hover:bg-sky-50"
+            onClick={() => {
+              setEditingMilestoneId(row.id);
+              setFormMode("edit");
+            }}
+            aria-label={`Edit milestone ${row.name}`}
+          >
+            <Pencil size={16} />
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="flex h-8 w-8 items-center justify-center border-red-200 text-red-600 hover:border-red-200 hover:bg-red-50"
+            onClick={() => setDeleteTarget(row)}
+            aria-label={`Delete milestone ${row.name}`}
+          >
+            <Trash2 size={16} />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   const editingMilestone = useMemo(
     () =>
@@ -152,14 +210,13 @@ export default function AdminMilestonesPage() {
         </Button>
       </div>
 
-      <MilestoneTable
-        milestones={milestones}
-        projectNameMap={projectNameMap}
-        onEdit={(milestone) => {
-          setEditingMilestoneId(milestone.id);
-          setFormMode("edit");
-        }}
-        onDelete={(milestone) => setDeleteTarget(milestone)}
+      <Table<MilestoneRecord>
+        rowKey="id"
+        columns={columns}
+        dataSource={milestones}
+        bordered
+        pagination={{ pageSize: 5, showSizeChanger: false }}
+        scroll={{ x: 920 }}
       />
 
       {formMode ? (

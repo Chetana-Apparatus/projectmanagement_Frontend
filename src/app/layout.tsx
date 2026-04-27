@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "antd/dist/reset.css";
 import "./globals.css";
 import ClientWrapper from "@/components/wrappers/ClientWrapper";
 

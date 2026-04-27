@@ -1,6 +1,6 @@
 "use client";
 
-import { Progress } from "antd";
+import { Progress, Table, type TableColumnsType } from "antd";
 import {
   CalendarClock,
   CircleCheck,
@@ -17,12 +17,7 @@ import ActivityLog, {
 import Card from "@/components/common/card/Card";
 import DashboardCard from "@/components/common/dashboard/DashboardCard";
 import StatusBadge from "@/components/common/status/StatusBadge";
-import DataTable, {
-  type DataTableColumn,
-} from "@/components/common/table/DataTable";
 import { calculateProgress, getProgressColor } from "@/utils/progress";
-
-/* ================= TYPES ================= */
 
 type ProjectOverviewRow = {
   id: string;
@@ -40,8 +35,6 @@ type WorkTrackingRow = {
   status: "Running" | "Paused" | "Auto-stopped";
 };
 
-/* ================= STATIC (REMOVE LATER WHEN API READY) ================= */
-
 const overviewStats = [
   { title: "Active Projects", value: 24, icon: FolderKanban },
   { title: "Tasks In Progress", value: 67, icon: ListTodo },
@@ -49,15 +42,11 @@ const overviewStats = [
   { title: "Active Employees", value: 36, icon: UserCheck },
 ] as const;
 
-/* ================= COMPONENT ================= */
-
-export default function AdminDashboardPage() {
-  // ✅ Backend-ready states
+export default function BADashboardPage() {
   const [projectRows, setProjectRows] = useState<ProjectOverviewRow[]>([]);
   const [workTracking, setWorkTracking] = useState<WorkTrackingRow[]>([]);
   const [activityItems, setActivityItems] = useState<ActivityLogItem[]>([]);
 
-  /* ================= TEMP DATA (REMOVE AFTER API) ================= */
   useEffect(() => {
     setProjectRows([
       {
@@ -109,29 +98,82 @@ export default function AdminDashboardPage() {
     ]);
   }, []);
 
-  /* ================= TABLE COLUMNS ================= */
+  const projectColumns: TableColumnsType<ProjectOverviewRow> = [
+    {
+      title: "Project Name",
+      dataIndex: "projectName",
+      key: "projectName",
+    },
+    {
+      title: "Current Milestone",
+      dataIndex: "milestone",
+      key: "milestone",
+    },
+    {
+      title: "Progress",
+      key: "progress",
+      render: (_, row) => {
+        const percent = calculateProgress(row.startDate, row.endDate);
 
-  const projectColumns: DataTableColumn[] = [
-    { label: "Project Name", key: "projectName" },
-    { label: "Current Milestone", key: "milestone" },
-    { label: "Progress", key: "progress" },
-    { label: "Status", key: "status" },
+        return (
+          <div className="min-w-[140px] max-w-[180px]">
+            <Progress
+              percent={percent}
+              strokeColor={getProgressColor(percent)}
+              size="small"
+              format={(value) => `${value ?? 0}%`}
+            />
+          </div>
+        );
+      },
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (status: ProjectOverviewRow["status"]) => (
+        <StatusBadge variant={status === "On Track" ? "onTrack" : "delayed"}>
+          {status}
+        </StatusBadge>
+      ),
+    },
   ];
 
-  const workColumns: DataTableColumn[] = [
-    { label: "Employee", key: "employee" },
-    { label: "Current Task / Project", key: "currentFocus" },
-    { label: "Status", key: "status" },
-  ];
+  const workColumns: TableColumnsType<WorkTrackingRow> = [
+    {
+      title: "Employee",
+      dataIndex: "employee",
+      key: "employee",
+    },
+    {
+      title: "Current Task / Project",
+      dataIndex: "currentFocus",
+      key: "currentFocus",
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (status: WorkTrackingRow["status"]) => {
+        const styles = {
+          Running: "bg-green-100 text-green-600",
+          Paused: "bg-yellow-100 text-yellow-600",
+          "Auto-stopped": "bg-gray-100 text-gray-600",
+        };
 
-  /* ================= UI ================= */
+        return (
+          <span className={`rounded-full px-2 py-1 text-xs ${styles[status]}`}>
+            {status}
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
-    <div className="p-6 space-y-10 max-w-7xl mx-auto">
-      {/* HEADER */}
+    <div className="mx-auto max-w-7xl space-y-10 p-6">
       <h3 className="h3 font-bold">Dashboard</h3>
 
-      {/* ================= CARDS ================= */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {overviewStats.map((card) => (
           <DashboardCard
@@ -143,7 +185,6 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      {/* ================= PROJECT OVERVIEW ================= */}
       <section className="space-y-3">
         <div>
           <h3 className="h3 font-semibold">Project Overview</h3>
@@ -152,40 +193,16 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <DataTable<ProjectOverviewRow>
+        <Table<ProjectOverviewRow>
+          rowKey="id"
           columns={projectColumns}
-          data={projectRows}
-          pageSize={5}
-          renderers={{
-            progress: (row) => {
-              const percent = calculateProgress(row.startDate, row.endDate);
-
-              return (
-                <div className="min-w-[140px] max-w-[180px]">
-                  <Progress
-                    percent={percent}
-                    strokeColor={getProgressColor(percent)}
-                    size="small"
-                    format={(value) => `${value ?? 0}%`}
-                  />
-                </div>
-              );
-            },
-            status: (_, value) => {
-              const status = value as ProjectOverviewRow["status"];
-              return (
-                <StatusBadge
-                  variant={status === "On Track" ? "onTrack" : "delayed"}
-                >
-                  {status}
-                </StatusBadge>
-              );
-            },
-          }}
+          dataSource={projectRows}
+          bordered
+          pagination={{ pageSize: 5, showSizeChanger: false }}
+          scroll={{ x: 760 }}
         />
       </section>
 
-      {/* ================= WORK TRACKING ================= */}
       <section className="space-y-3">
         <div>
           <h3 className="h3 font-semibold">Work Tracking Summary</h3>
@@ -198,41 +215,23 @@ export default function AdminDashboardPage() {
             Auto-stopped at 8 PM (Mon–Fri)
           </div>
 
-          <DataTable<WorkTrackingRow>
+          <Table<WorkTrackingRow>
+            rowKey="id"
             columns={workColumns}
-            data={workTracking}
-            pageSize={5}
-            renderers={{
-              status: (_, value) => {
-                const status = value as WorkTrackingRow["status"];
-
-                const styles = {
-                  Running: "bg-green-100 text-green-600",
-                  Paused: "bg-yellow-100 text-yellow-600",
-                  "Auto-stopped": "bg-gray-100 text-gray-600",
-                };
-
-                return (
-                  <span
-                    className={`px-2 py-1 text-xs rounded-full ${styles[status]}`}
-                  >
-                    {status}
-                  </span>
-                );
-              },
-            }}
+            dataSource={workTracking}
+            bordered
+            pagination={{ pageSize: 5, showSizeChanger: false }}
+            scroll={{ x: 640 }}
           />
         </Card>
       </section>
 
-      {/* ================= RECENT ACTIVITY ================= */}
       <section className="space-y-3">
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CalendarClock size={18} className="text-gray-400" />
             <h3 className="h3 font-semibold">Recent Activity</h3>
           </div>
-
           <span className="p1 text-gray-400">Live</span>
         </div>
 

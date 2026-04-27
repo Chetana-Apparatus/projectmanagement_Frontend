@@ -8,10 +8,30 @@ import Input from "@/components/ui/Input";
 
 const statuses = ["Not Started", "Pending", "In Progress", "Completed"];
 
-type TaskFormValues = Omit<Task, "id">;
+type EmployeeOption = {
+  id: string;
+  name: string;
+};
+
+type ProjectOption = {
+  id: string;
+  name: string;
+};
+
+type MilestoneOption = {
+  id: string;
+  name: string;
+  projectId: string;
+};
+
+export type TaskFormValues = Omit<Task, "id" | "employee">;
 
 type TaskFormProps = {
   initial?: Task | null;
+  employees?: EmployeeOption[];
+  projects?: ProjectOption[];
+  milestones?: MilestoneOption[];
+  showAssignedBy?: boolean;
   onSubmit: (values: TaskFormValues) => void;
   onCancel: () => void;
 };
@@ -20,7 +40,6 @@ const emptyForm: TaskFormValues = {
   name: "",
   project: "",
   milestone: "",
-  employee: "",
   assignedBy: "",
   startDate: "",
   endDate: "",
@@ -29,16 +48,19 @@ const emptyForm: TaskFormValues = {
 
 export default function TaskForm({
   initial,
+  employees = [],
+  projects = [],
+  milestones = [],
+  showAssignedBy = false,
   onSubmit,
   onCancel,
 }: TaskFormProps) {
-  const [form, setForm] = useState(
+  const [form, setForm] = useState<TaskFormValues>(
     initial
       ? {
           name: initial.name,
           project: initial.project,
           milestone: initial.milestone,
-          employee: initial.employee,
           assignedBy: initial.assignedBy,
           startDate: initial.startDate,
           endDate: initial.endDate,
@@ -53,7 +75,6 @@ export default function TaskForm({
         name: initial.name,
         project: initial.project,
         milestone: initial.milestone,
-        employee: initial.employee,
         assignedBy: initial.assignedBy,
         startDate: initial.startDate,
         endDate: initial.endDate,
@@ -64,6 +85,10 @@ export default function TaskForm({
     setForm(emptyForm);
   }, [initial]);
 
+  const availableMilestones = form.project
+    ? milestones.filter((milestone) => milestone.projectId === form.project)
+    : milestones;
+
   return (
     <Card className="w-full !flex-col !items-start !justify-start p-6">
       <form
@@ -73,107 +98,140 @@ export default function TaskForm({
           onSubmit(form);
         }}
       >
-        <div className="w-full">
-          <h2 className="ui-section-title">
+        {/* HEADER */}
+        <div className="w-full text-center">
+          <h2 className="text-lg font-semibold">
             {initial ? "Edit Task" : "Add Task"}
           </h2>
-          <p className="ui-caption mt-1">
-            Manage task details, assignment, and schedule.
-          </p>
         </div>
 
+        {/* FORM */}
         <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+          {/* TASK NAME */}
           <div className="space-y-1.5 md:col-span-2">
-            <label htmlFor="taskName" className="ui-caption">
+            <label htmlFor="task-name" className="text-sm font-medium">
               Task Name
             </label>
             <Input
-              id="taskName"
+              id="task-name"
               placeholder="Enter task name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
 
+          {/* PROJECT */}
           <div className="space-y-1.5">
-            <label htmlFor="project" className="ui-caption">
+            <label htmlFor="task-project" className="text-sm font-medium">
               Project
             </label>
-            <Input
-              id="project"
-              placeholder="Enter project"
+            <select
+              id="task-project"
+              className="h-10 w-full rounded-md border px-3 text-sm"
               value={form.project}
-              onChange={(e) => setForm({ ...form, project: e.target.value })}
-            />
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  project: e.target.value,
+                  milestone: "",
+                })
+              }
+              required
+            >
+              <option value="">Select project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
           </div>
 
+          {/* MILESTONE */}
           <div className="space-y-1.5">
-            <label htmlFor="milestone" className="ui-caption">
+            <label htmlFor="task-milestone" className="text-sm font-medium">
               Milestone
             </label>
-            <Input
-              id="milestone"
-              placeholder="Enter milestone"
+            <select
+              id="task-milestone"
+              className="h-10 w-full rounded-md border px-3 text-sm"
               value={form.milestone}
               onChange={(e) => setForm({ ...form, milestone: e.target.value })}
-            />
+              required
+              disabled={!form.project}
+            >
+              <option value="">
+                {form.project ? "Select milestone" : "Select project first"}
+              </option>
+              {availableMilestones.map((milestone) => (
+                <option key={milestone.id} value={milestone.id}>
+                  {milestone.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor="assignedEmployee" className="ui-caption">
-              Assigned Employee
-            </label>
-            <Input
-              id="assignedEmployee"
-              placeholder="Enter employee name"
-              value={form.employee}
-              onChange={(e) => setForm({ ...form, employee: e.target.value })}
-            />
-          </div>
+          {showAssignedBy && (
+            <div className="space-y-1.5 md:col-span-2">
+              <label htmlFor="task-assigned-by" className="text-sm font-medium">
+                Assigned By
+              </label>
+              <select
+                id="task-assigned-by"
+                className="h-10 w-full rounded-md border px-3 text-sm"
+                value={form.assignedBy}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    assignedBy: e.target.value,
+                  })
+                }
+                required
+              >
+                <option value="">Select employee</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
+          {/* START DATE */}
           <div className="space-y-1.5">
-            <label htmlFor="assignedBy" className="ui-caption">
-              Assigned By
-            </label>
-            <Input
-              id="assignedBy"
-              placeholder="Enter assigned by"
-              value={form.assignedBy}
-              onChange={(e) => setForm({ ...form, assignedBy: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="startDate" className="ui-caption">
+            <label htmlFor="task-start-date" className="text-sm font-medium">
               Start Date
             </label>
             <Input
-              id="startDate"
+              id="task-start-date"
               type="date"
               value={form.startDate}
               onChange={(e) => setForm({ ...form, startDate: e.target.value })}
             />
           </div>
 
+          {/* END DATE */}
           <div className="space-y-1.5">
-            <label htmlFor="endDate" className="ui-caption">
+            <label htmlFor="task-end-date" className="text-sm font-medium">
               End Date
             </label>
             <Input
-              id="endDate"
+              id="task-end-date"
               type="date"
               value={form.endDate}
               onChange={(e) => setForm({ ...form, endDate: e.target.value })}
             />
           </div>
 
+          {/* STATUS */}
           <div className="space-y-1.5 md:col-span-2">
-            <label htmlFor="status" className="ui-caption">
+            <label htmlFor="task-status" className="text-sm font-medium">
               Status
             </label>
             <select
-              id="status"
-              className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-cs-primary-100/30 focus-visible:outline-none"
+              id="task-status"
+              className="h-10 w-full rounded-md border px-3 text-sm"
               value={form.status}
               onChange={(e) =>
                 setForm({
@@ -189,7 +247,8 @@ export default function TaskForm({
           </div>
         </div>
 
-        <div className="flex w-full justify-end gap-2 border-t border-gray-100 pt-4">
+        {/* ACTIONS */}
+        <div className="flex justify-end gap-2 border-t pt-4">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>

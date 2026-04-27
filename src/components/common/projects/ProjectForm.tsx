@@ -1,8 +1,8 @@
 "use client";
 
+import { Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
-import type { ProjectStatus } from "@/components/common/projects/ProjectTable";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
@@ -11,7 +11,7 @@ export type ProjectFormValues = {
   description: string;
   startDate: string;
   endDate: string;
-  status: ProjectStatus;
+  document: File | null;
 };
 
 type Props = {
@@ -20,172 +20,181 @@ type Props = {
   onCancel: () => void;
 };
 
-type FormErrors = Partial<Record<keyof ProjectFormValues, string>>;
-const MAX_TEXT_LENGTH = 15;
-const PROJECT_STATUSES: ProjectStatus[] = [
-  "Planned",
-  "In Progress",
-  "Completed",
-];
-
 export default function ProjectForm({
   initialValues,
   onSubmit,
   onCancel,
 }: Props) {
-  const emptyForm: ProjectFormValues = {
+  const [form, setForm] = useState<ProjectFormValues>({
     name: "",
     description: "",
     startDate: "",
     endDate: "",
-    status: "Planned",
-  };
+    document: null,
+  });
 
-  const [form, setForm] = useState<ProjectFormValues>(
-    initialValues || emptyForm,
-  );
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [dragOver, setDragOver] = useState(false);
+  const [documentError, setDocumentError] = useState("");
 
   useEffect(() => {
-    setForm(initialValues || emptyForm);
-    setErrors({});
+    if (!initialValues) return;
+    setForm(initialValues);
   }, [initialValues]);
 
-  const validate = () => {
-    const nextErrors: FormErrors = {};
-    const name = form.name.trim();
-    const description = form.description.trim();
-
-    if (!name) nextErrors.name = "Project name is required";
-    else if (name.length > MAX_TEXT_LENGTH) {
-      nextErrors.name = `Project name must be ${MAX_TEXT_LENGTH} characters or fewer`;
-    }
-
-    if (!description) nextErrors.description = "Description is required";
-    else if (description.length > MAX_TEXT_LENGTH) {
-      nextErrors.description = `Description must be ${MAX_TEXT_LENGTH} characters or fewer`;
-    }
-
-    if (!form.startDate) nextErrors.startDate = "Start date is required";
-    if (!form.endDate) nextErrors.endDate = "End date is required";
-    if (!form.status) nextErrors.status = "Status is required";
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(form);
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!validate()) return;
-    onSubmit({
-      ...form,
-      name: form.name.trim(),
-      description: form.description.trim(),
-    });
+  const isSupportedFile = (file: File) => {
+    const lowerName = file.name.toLowerCase();
+    return lowerName.endsWith(".docx") || lowerName.endsWith(".md");
+  };
+
+  const updateDocument = (file: File | null) => {
+    if (!file) return;
+    if (!isSupportedFile(file)) {
+      setDocumentError("Only .docx and .md files are allowed.");
+      return;
+    }
+    setDocumentError("");
+    setForm((prev) => ({ ...prev, document: file }));
   };
 
   return (
-    <Card className="w-full !flex-col !items-start !justify-start p-6 space-y-5">
-      <form onSubmit={handleSubmit} className="w-full space-y-5">
-        <div className="w-full">
-          <h2 className="ui-section-title">
+    <Card
+      padding="none"
+      className="flex max-h-[calc(100vh-8rem)] w-full max-w-xl !flex-col !items-stretch !justify-start overflow-hidden rounded-lg border border-border/80 bg-white shadow-2xl"
+    >
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        {/* HEADER */}
+        <div className="shrink-0 border-b border-gray-100 px-6 py-4 text-center">
+          <h2 className="text-xl font-semibold">
             {initialValues ? "Edit Project" : "Add Project"}
           </h2>
-          <p className="ui-caption mt-1">
-            Provide project details and timeline.
-          </p>
         </div>
 
-        <div className="grid w-full grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2 space-y-1.5">
-            <label htmlFor="projectName" className="ui-caption">
+        {/* SCROLLABLE BODY */}
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6 pr-4">
+          {/* PROJECT NAME */}
+          <div className="space-y-1.5">
+            <label htmlFor="project-name" className="text-sm font-medium">
               Project Name
             </label>
             <Input
-              id="projectName"
-              maxLength={MAX_TEXT_LENGTH}
+              id="project-name"
+              className="h-11 w-full rounded-lg px-3"
               placeholder="Enter project name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-            {errors.name ? (
-              <p className="text-xs text-red-500">{errors.name}</p>
-            ) : null}
           </div>
 
-          <div className="md:col-span-2 space-y-1.5">
-            <label htmlFor="description" className="ui-caption">
+          {/* DESCRIPTION */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="project-description"
+              className="text-sm font-medium"
+            >
               Description
             </label>
             <Input
-              id="description"
-              maxLength={MAX_TEXT_LENGTH}
-              placeholder="Enter short description"
+              id="project-description"
+              className="h-11 w-full rounded-lg px-3"
+              placeholder="Enter description"
               value={form.description}
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
             />
-            {errors.description ? (
-              <p className="text-xs text-red-500">{errors.description}</p>
-            ) : null}
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor="startDate" className="ui-caption">
-              Start Date
-            </label>
-            <Input
-              id="startDate"
-              type="date"
-              value={form.startDate}
-              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-            />
-            {errors.startDate ? (
-              <p className="text-xs text-red-500">{errors.startDate}</p>
-            ) : null}
+          {/* DATES */}
+          <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-2 sm:gap-x-6">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="project-start-date"
+                className="text-sm font-medium"
+              >
+                Start Date
+              </label>
+              <Input
+                id="project-start-date"
+                type="date"
+                className="h-11 w-full rounded-lg px-3"
+                value={form.startDate}
+                onChange={(e) =>
+                  setForm({ ...form, startDate: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="project-end-date" className="text-sm font-medium">
+                End Date
+              </label>
+              <Input
+                id="project-end-date"
+                type="date"
+                className="h-11 w-full rounded-lg px-3"
+                value={form.endDate}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor="endDate" className="ui-caption">
-              End Date
-            </label>
-            <Input
-              id="endDate"
-              type="date"
-              value={form.endDate}
-              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-            />
-            {errors.endDate ? (
-              <p className="text-xs text-red-500">{errors.endDate}</p>
-            ) : null}
-          </div>
+          {/* DOCUMENT */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Document</p>
 
-          <div className="space-y-1.5 md:col-span-2">
-            <label htmlFor="status" className="ui-caption">
-              Status
-            </label>
-            <select
-              id="status"
-              value={form.status}
-              onChange={(e) =>
-                setForm({ ...form, status: e.target.value as ProjectStatus })
-              }
-              className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-cs-primary-100/30 focus-visible:outline-none"
+            <fieldset
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                updateDocument(e.dataTransfer.files?.[0] || null);
+              }}
+              className={`rounded-lg border-2 border-dashed p-5 text-center transition ${
+                dragOver
+                  ? "border-blue-400 bg-blue-50"
+                  : "border-gray-300 bg-gray-50"
+              }`}
             >
-              {PROJECT_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-            {errors.status ? (
-              <p className="text-xs text-red-500">{errors.status}</p>
-            ) : null}
+              <Upload size={22} className="mx-auto mb-2 text-gray-500" />
+
+              <p className="text-sm font-medium">
+                Drag & drop .docx or .md file here
+              </p>
+              <p className="mb-3 text-xs text-gray-500">or upload manually</p>
+
+              <label className="inline-block cursor-pointer rounded-md border px-3 py-1.5 text-sm hover:bg-gray-100">
+                Browse file
+                <input
+                  type="file"
+                  accept=".docx,.md"
+                  className="hidden"
+                  onChange={(e) => updateDocument(e.target.files?.[0] || null)}
+                />
+              </label>
+
+              {form.document && (
+                <p className="mt-3 truncate text-xs text-green-600">
+                  {form.document.name}
+                </p>
+              )}
+              {documentError && (
+                <p className="mt-2 text-xs text-red-600">{documentError}</p>
+              )}
+            </fieldset>
           </div>
         </div>
 
-        <div className="flex w-full justify-end gap-2 pt-1">
+        {/* FIXED FOOTER */}
+        <div className="flex shrink-0 justify-end gap-3 border-t border-gray-100 bg-white px-6 py-4">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>

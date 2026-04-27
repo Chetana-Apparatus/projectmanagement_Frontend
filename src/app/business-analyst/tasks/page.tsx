@@ -1,15 +1,17 @@
 "use client";
 
+import { Progress, Table, type TableColumnsType } from "antd";
 import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import TaskForm, {
   type TaskFormValues,
 } from "@/components/common/tasks/TaskForm";
-import TaskTable, { type Task } from "@/components/common/tasks/TaskTable";
+import type { Task } from "@/components/common/tasks/TaskTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import { calculateProgress, getProgressColor } from "@/utils/progress";
 
-export default function TaskPage() {
+export default function BATasksPage() {
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [open, setOpen] = useState(false);
@@ -20,27 +22,44 @@ export default function TaskPage() {
     { id: "emp-3", name: "Nisha Gupta" },
     { id: "emp-4", name: "Karan Singh" },
   ];
-  const projects = [
-    { id: "prj-101", name: "Project Atlas" },
-    { id: "prj-102", name: "Project Beacon" },
-    { id: "prj-103", name: "Project Horizon" },
-  ];
-  const milestones = [
-    { id: "ms-1", name: "Requirements Sign-off", projectId: "prj-101" },
-    { id: "ms-2", name: "UI Prototype Completion", projectId: "prj-102" },
-    { id: "ms-3", name: "API Integration", projectId: "prj-103" },
-  ];
-  const projectNameMap = Object.fromEntries(
-    projects.map((project) => [project.id, project.name]),
-  );
-  const milestoneNameMap = Object.fromEntries(
-    milestones.map((milestone) => [milestone.id, milestone.name]),
-  );
-  const assignedByNameMap = Object.fromEntries(
+  const employeeNameById = Object.fromEntries(
     employees.map((employee) => [employee.id, employee.name]),
   );
 
+  const columns: TableColumnsType<Task> = [
+    { title: "TASK NAME", dataIndex: "name", key: "name" },
+    {
+      title: "ASSIGNED BY",
+      dataIndex: "assignedBy",
+      key: "assignedBy",
+      render: (assignedBy: string) =>
+        employeeNameById[assignedBy] ?? assignedBy,
+    },
+    { title: "STATUS", dataIndex: "status", key: "status" },
+    { title: "START DATE", dataIndex: "startDate", key: "startDate" },
+    { title: "END DATE", dataIndex: "endDate", key: "endDate" },
+    {
+      title: "PROGRESS",
+      key: "progress",
+      render: (_, row) => {
+        const percent = calculateProgress(row.startDate, row.endDate);
+        return (
+          <div className="min-w-[140px] max-w-[180px]">
+            <Progress
+              percent={percent}
+              strokeColor={getProgressColor(percent)}
+              size="small"
+              format={(value) => `${value ?? 0}%`}
+            />
+          </div>
+        );
+      },
+    },
+  ];
+
   const handleSubmit = (data: TaskFormValues) => {
+    // Backend should derive watcher from logged-in BA session.
+    // Frontend sends assignedBy only; watcher is intentionally omitted.
     if (editing) {
       setTasks((prev) =>
         prev.map((t) =>
@@ -50,7 +69,11 @@ export default function TaskPage() {
       showToast("Task updated successfully", "success");
     } else {
       setTasks((prev) => [
-        { ...data, id: Date.now().toString(), employee: "" },
+        {
+          ...data,
+          id: Date.now().toString(),
+          employee: "",
+        },
         ...prev,
       ]);
       showToast("Task created successfully", "success");
@@ -64,16 +87,6 @@ export default function TaskPage() {
     setEditing(null);
   };
 
-  const handleEdit = (task: Task) => {
-    setEditing(task);
-    setOpen(true);
-  };
-
-  const handleDelete = (task: Task) => {
-    setTasks((prev) => prev.filter((item) => item.id !== task.id));
-    showToast("Task deleted successfully", "success");
-  };
-
   useEffect(() => {
     if (!open) return undefined;
 
@@ -84,7 +97,7 @@ export default function TaskPage() {
   }, [open]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex justify-between">
         <h1 className="ui-page-title">Tasks</h1>
         <Button onClick={() => setOpen(true)}>
@@ -92,25 +105,26 @@ export default function TaskPage() {
         </Button>
       </div>
 
-      <TaskTable
-        tasks={tasks}
-        projectNameMap={projectNameMap}
-        milestoneNameMap={milestoneNameMap}
-        assignedByNameMap={assignedByNameMap}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
+      <Table<Task>
+        rowKey="id"
+        columns={columns}
+        dataSource={tasks}
+        bordered
+        locale={{ emptyText: "No tasks found" }}
+        pagination={{ pageSize: 5, showSizeChanger: false }}
+        scroll={{ x: 760 }}
       />
 
       {open && (
-        <div className="fixed inset-0 z-50 overflow-y-auto p-4 flex justify-center">
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto p-4">
           <button
             type="button"
             className="absolute inset-0 bg-black/45 backdrop-blur-sm"
             onClick={closeModal}
             aria-label="Close modal"
           />
-          <div className="relative z-50 my-6 w-full max-w-xl space-y-2 pointer-events-none">
-            <div className="flex justify-end pointer-events-auto">
+          <div className="pointer-events-none relative z-50 my-6 w-full max-w-xl space-y-2">
+            <div className="pointer-events-auto flex justify-end">
               <Button variant="secondary" size="icon" onClick={closeModal}>
                 <X size={16} />
               </Button>
@@ -120,8 +134,6 @@ export default function TaskPage() {
               <TaskForm
                 initial={editing}
                 employees={employees}
-                projects={projects}
-                milestones={milestones}
                 showAssignedBy
                 onSubmit={handleSubmit}
                 onCancel={closeModal}

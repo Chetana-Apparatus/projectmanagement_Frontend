@@ -16,15 +16,11 @@ export type MilestoneFormValues = {
   startDate: string;
   endDate: string;
   deadline: string;
-  assignedEmployeeIds: string[];
-  watcherIds: string[];
 };
 
 type MilestoneFormProps = {
   mode: "create" | "edit";
   projects: SelectOption[];
-  employees: SelectOption[];
-  watchers: SelectOption[];
   initialValues?: MilestoneFormValues;
   onCancel: () => void;
   onSubmit: (values: MilestoneFormValues) => void;
@@ -38,19 +34,11 @@ const emptyForm: MilestoneFormValues = {
   startDate: "",
   endDate: "",
   deadline: "",
-  assignedEmployeeIds: [],
-  watcherIds: [],
 };
-
-function getSelectedValues(event: React.ChangeEvent<HTMLSelectElement>) {
-  return Array.from(event.target.selectedOptions, (option) => option.value);
-}
 
 export default function MilestoneForm({
   mode,
   projects,
-  employees,
-  watchers,
   initialValues,
   onCancel,
   onSubmit,
@@ -84,14 +72,6 @@ export default function MilestoneForm({
     if (!values.endDate) nextErrors.endDate = "End date is required";
     if (!values.deadline) nextErrors.deadline = "Deadline is required";
 
-    if (values.assignedEmployeeIds.length === 0) {
-      nextErrors.assignedEmployeeIds = "Select at least one assigned employee";
-    }
-
-    if (values.watcherIds.length === 0) {
-      nextErrors.watcherIds = "Select at least one watcher";
-    }
-
     if (
       values.startDate &&
       values.endDate &&
@@ -123,160 +103,115 @@ export default function MilestoneForm({
   const errorClass = "text-xs text-red-500";
 
   const selectClass =
-    "h-10 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cs-primary-100/30";
-
-  const multiSelectClass =
-    "min-h-[120px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cs-primary-100/30";
+    "h-11 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cs-primary-100/30";
 
   return (
     <Card
       variant="surface"
-      padding="lg"
-      className="w-full h-[calc(100vh-7rem)] items-stretch justify-start overflow-hidden rounded-2xl border border-border/80 bg-white/95 px-6 shadow-2xl sm:px-8 lg:px-10"
+      padding="none"
+      className="flex max-h-[calc(100vh-8rem)] w-full !flex-col !items-stretch !justify-start overflow-hidden rounded-lg border border-border/80 !bg-white shadow-2xl"
     >
-      <form
-        onSubmit={handleSubmit}
-        className="h-full w-full max-w-3xl space-y-5 overflow-y-auto pr-1"
-      >
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
         {/* HEADER */}
-        <div className="space-y-1 text-center">
+        <div className="shrink-0 border-b border-gray-100 bg-white px-6 py-4 text-center">
           <h2 className="h3">{title}</h2>
           <p className="ui-body-muted">
-            Manage milestone timeline, assignment, and project ownership.
+            Manage milestone timeline and project details.
           </p>
         </div>
 
-        {/* PROJECT */}
-        <div className={fieldClass}>
-          <label htmlFor="projectId" className={labelClass}>
-            Project
-          </label>
-          <select
-            id="projectId"
-            value={values.projectId}
-            onChange={(e) => setField("projectId", e.target.value)}
-            className={selectClass}
-          >
-            <option value="">Select project</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          {errors.projectId && <p className={errorClass}>{errors.projectId}</p>}
-        </div>
-
-        {/* NAME */}
-        <div className={fieldClass}>
-          <label htmlFor="name" className={labelClass}>
-            Milestone Name
-          </label>
-          <Input
-            id="name"
-            maxLength={30}
-            value={values.name}
-            onChange={(e) => setField("name", e.target.value)}
-            placeholder="Enter milestone name"
-          />
-          {errors.name && <p className={errorClass}>{errors.name}</p>}
-        </div>
-
-        {/* DATES */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6 pr-4">
+          {/* PROJECT */}
           <div className={fieldClass}>
-            <label htmlFor="startDate" className={labelClass}>
-              Start Date
-            </label>
-            <Input
-              id="startDate"
-              type="date"
-              value={values.startDate}
-              onChange={(e) => setField("startDate", e.target.value)}
-            />
-            {errors.startDate && (
-              <p className={errorClass}>{errors.startDate}</p>
-            )}
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="endDate" className={labelClass}>
-              End Date
-            </label>
-            <Input
-              id="endDate"
-              type="date"
-              value={values.endDate}
-              onChange={(e) => setField("endDate", e.target.value)}
-            />
-            {errors.endDate && <p className={errorClass}>{errors.endDate}</p>}
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="deadline" className={labelClass}>
-              Deadline
-            </label>
-            <Input
-              id="deadline"
-              type="date"
-              value={values.deadline}
-              onChange={(e) => setField("deadline", e.target.value)}
-            />
-            {errors.deadline && <p className={errorClass}>{errors.deadline}</p>}
-          </div>
-        </div>
-
-        {/* MULTI SELECT */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className={fieldClass}>
-            <label htmlFor="assignedEmployeeIds" className={labelClass}>
-              Assigned Employees
+            <label htmlFor="milestone-project" className={labelClass}>
+              Project
             </label>
             <select
-              id="assignedEmployeeIds"
-              multiple
-              value={values.assignedEmployeeIds}
-              onChange={(e) =>
-                setField("assignedEmployeeIds", getSelectedValues(e))
-              }
-              className={multiSelectClass}
+              id="milestone-project"
+              value={values.projectId}
+              onChange={(e) => setField("projectId", e.target.value)}
+              className={selectClass}
             >
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.label}
+              <option value="">Select project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
                 </option>
               ))}
             </select>
-            {errors.assignedEmployeeIds && (
-              <p className={errorClass}>{errors.assignedEmployeeIds}</p>
+            {errors.projectId && (
+              <p className={errorClass}>{errors.projectId}</p>
             )}
           </div>
 
+          {/* NAME */}
           <div className={fieldClass}>
-            <label htmlFor="watcherIds" className={labelClass}>
-              Watchers (BA)
+            <label htmlFor="milestone-name" className={labelClass}>
+              Milestone Name
             </label>
-            <select
-              id="watcherIds"
-              multiple
-              value={values.watcherIds}
-              onChange={(e) => setField("watcherIds", getSelectedValues(e))}
-              className={multiSelectClass}
-            >
-              {watchers.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.label}
-                </option>
-              ))}
-            </select>
-            {errors.watcherIds && (
-              <p className={errorClass}>{errors.watcherIds}</p>
-            )}
+            <Input
+              id="milestone-name"
+              className="h-11 w-full rounded-lg border px-3 text-sm"
+              maxLength={30}
+              value={values.name}
+              onChange={(e) => setField("name", e.target.value)}
+              placeholder="Enter milestone name"
+            />
+            {errors.name && <p className={errorClass}>{errors.name}</p>}
+          </div>
+
+          {/* DATES */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className={fieldClass}>
+              <label htmlFor="milestone-start-date" className={labelClass}>
+                Start Date
+              </label>
+              <Input
+                id="milestone-start-date"
+                className="h-11 w-full rounded-lg border px-3 text-sm"
+                type="date"
+                value={values.startDate}
+                onChange={(e) => setField("startDate", e.target.value)}
+              />
+              {errors.startDate && (
+                <p className={errorClass}>{errors.startDate}</p>
+              )}
+            </div>
+
+            <div className={fieldClass}>
+              <label htmlFor="milestone-end-date" className={labelClass}>
+                End Date
+              </label>
+              <Input
+                id="milestone-end-date"
+                className="h-11 w-full rounded-lg border px-3 text-sm"
+                type="date"
+                value={values.endDate}
+                onChange={(e) => setField("endDate", e.target.value)}
+              />
+              {errors.endDate && <p className={errorClass}>{errors.endDate}</p>}
+            </div>
+
+            <div className={fieldClass}>
+              <label htmlFor="milestone-deadline" className={labelClass}>
+                Deadline
+              </label>
+              <Input
+                id="milestone-deadline"
+                className="h-11 w-full rounded-lg border px-3 text-sm"
+                type="date"
+                value={values.deadline}
+                onChange={(e) => setField("deadline", e.target.value)}
+              />
+              {errors.deadline && (
+                <p className={errorClass}>{errors.deadline}</p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* FOOTER */}
-        <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-gray-100 bg-white px-6 py-4">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>

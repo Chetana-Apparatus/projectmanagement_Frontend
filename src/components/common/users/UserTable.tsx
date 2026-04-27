@@ -15,6 +15,9 @@ export type UserRecord = {
   firstName: string;
   lastName: string;
   email: string;
+  designation: string;
+  developerType: string;
+  techStack: string[];
   role: UserRole;
   status: UserStatus;
 };
@@ -30,6 +33,9 @@ export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
     { label: "First Name", key: "firstName" },
     { label: "Last Name", key: "lastName" },
     { label: "Email", key: "email" },
+    { label: "Designation", key: "designation" },
+    { label: "Developer Type", key: "developerType" },
+    { label: "Tech Stack", key: "techStack" },
     { label: "Role", key: "role" },
     { label: "Status", key: "status" },
     { label: "Actions", key: "actions" },
@@ -41,6 +47,11 @@ export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
       data={users}
       emptyMessage="No users found"
       renderers={{
+        techStack: (row) => (
+          <span className="line-clamp-1 max-w-[220px]">
+            {row.techStack.length > 0 ? row.techStack.join(", ") : "-"}
+          </span>
+        ),
         status: (row) => (
           <StatusBadge
             variant={row.status === "Active" ? "active" : "deactivated"}
@@ -53,7 +64,7 @@ export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
             <Button
               type="button"
               variant="secondary"
-              className=" border-sky-200 text-sky-600 h-8 px-3 text-xs"
+              className="flex h-8 w-8 items-center justify-center border-sky-200 text-sky-600 hover:border-sky-200 hover:bg-sky-50"
               onClick={() => onEdit(row)}
             >
               <Pencil size={16} />
@@ -61,7 +72,7 @@ export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
             <Button
               type="button"
               variant="secondary"
-              className="h-8 border-red-200 px-3 text-xs text-red-600 hover:bg-red-50 hover:border-red-200"
+              className="flex h-8 w-8 items-center justify-center border-red-200 text-red-600 hover:border-red-200 hover:bg-red-50"
               onClick={() => onDelete(row)}
             >
               <Trash2 size={16} />

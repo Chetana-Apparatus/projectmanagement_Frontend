@@ -1,40 +1,62 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/passwordInput";
-import type { UserRecord, UserRole, UserStatus } from "./UserTable";
+import type { UserRecord } from "./UserTable";
 
 export type UserFormValues = {
   firstName: string;
   lastName: string;
   email: string;
-  role: UserRole;
-  status: UserStatus;
   password: string;
   resetPassword: boolean;
+
+  designation: string;
+  developerType: string;
+  techStack: string[];
 };
 
-type UserFormProps = {
+type Props = {
   mode: "create" | "edit";
   initialValues?: Partial<UserRecord>;
   onCancel: () => void;
   onSubmit: (values: UserFormValues) => void;
 };
 
-type FormErrors = Partial<Record<keyof UserFormValues, string>>;
-const MAX_NAME_LENGTH = 15;
+const DESIGNATIONS = [
+  "Intern",
+  "Trainee",
+  "Junior Developer",
+  "Senior Developer",
+];
+
+const DEV_TYPES = ["Frontend", "Backend", "Fullstack"];
+
+const TECH_STACK = [
+  "Next.js",
+  "React",
+  "TypeScript",
+  "JavaScript",
+  "Node.js",
+  "Express",
+  "Python",
+  "Django",
+  "AI/ML",
+  "WordPress",
+];
 
 const initialState: UserFormValues = {
   firstName: "",
   lastName: "",
   email: "",
-  role: "Employee",
-  status: "Active",
   password: "",
   resetPassword: false,
+  designation: "",
+  developerType: "",
+  techStack: [],
 };
 
 export default function UserForm({
@@ -42,222 +64,202 @@ export default function UserForm({
   initialValues,
   onCancel,
   onSubmit,
-}: UserFormProps) {
-  const [values, setValues] = useState<UserFormValues>(initialState);
-  const [errors, setErrors] = useState<FormErrors>({});
+}: Props) {
+  const [values, setValues] = useState(initialState);
 
   useEffect(() => {
-    if (!initialValues) {
-      setValues(initialState);
-      return;
-    }
+    if (!initialValues) return;
 
     setValues((prev) => ({
       ...prev,
-      firstName: initialValues.firstName ?? "",
-      lastName: initialValues.lastName ?? "",
-      email: initialValues.email ?? "",
-      role: (initialValues.role as UserRole | undefined) ?? "Employee",
-      status: (initialValues.status as UserStatus | undefined) ?? "Active",
-      password: "",
-      resetPassword: false,
+      firstName: initialValues.firstName || "",
+      lastName: initialValues.lastName || "",
+      email: initialValues.email || "",
+      designation: initialValues.designation || "",
+      developerType: initialValues.developerType || "",
+      techStack: initialValues.techStack || [],
     }));
   }, [initialValues]);
 
-  const title = useMemo(
-    () => (mode === "create" ? "Create User" : "Edit User"),
-    [mode],
-  );
-
-  const setField = <K extends keyof UserFormValues>(
-    key: K,
-    value: UserFormValues[K],
-  ) => {
-    setValues((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const validate = () => {
-    const nextErrors: FormErrors = {};
-
-    if (!values.firstName.trim())
-      nextErrors.firstName = "First name is required";
-    else if (values.firstName.trim().length > MAX_NAME_LENGTH) {
-      nextErrors.firstName = `First name must be ${MAX_NAME_LENGTH} characters or fewer`;
-    }
-    if (!values.lastName.trim()) nextErrors.lastName = "Last name is required";
-    else if (values.lastName.trim().length > MAX_NAME_LENGTH) {
-      nextErrors.lastName = `Last name must be ${MAX_NAME_LENGTH} characters or fewer`;
-    }
-    if (!values.email.trim()) nextErrors.email = "Email is required";
-    if (!values.role) nextErrors.role = "Role is required";
-
-    if (mode === "create" || values.resetPassword) {
-      if (!values.password.trim()) nextErrors.password = "Password is required";
-      else if (values.password.trim().length < 6)
-        nextErrors.password = "Minimum 6 characters required";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  };
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!validate()) return;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     onSubmit(values);
   };
 
-  const fieldClass = "space-y-1.5";
-  const labelClass = "text-sm font-medium text-cs-heading";
-  const errorClass = "text-xs text-red-500";
-
   return (
     <Card
-      variant="surface"
-      padding="lg"
-      className="w-full h-[calc(100vh-7rem)] items-stretch justify-start overflow-hidden rounded-2xl border border-border/80 bg-white/95 px-6 shadow-2xl sm:px-8 lg:px-10"
+      padding="none"
+      className="flex max-h-[calc(100vh-8rem)] w-full !flex-col !items-stretch !justify-start overflow-hidden rounded-lg border border-border/80 !bg-white shadow-2xl"
     >
-      <form
-        onSubmit={handleSubmit}
-        className="mx-auto h-full w-full max-w-3xl space-y-5 overflow-y-auto pr-1"
-      >
-        <div className="space-y-1">
-          <h2 className="h3">{title}</h2>
-          <p className="ui-body-muted">
-            {mode === "create"
-              ? "Create a new account and send login credentials via email."
-              : "Update user details and optionally set a new password."}
-          </p>
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        {/* TITLE */}
+        <div className="shrink-0 border-b border-gray-100 bg-white px-6 py-4 text-center">
+          <h2 className="text-lg font-semibold text-cs-heading">
+            {mode === "create" ? "Create User" : "Edit User"}
+          </h2>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className={fieldClass}>
-            <label className={labelClass} htmlFor="firstName">
-              First Name
-            </label>
+        {/* FORM BODY */}
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-white p-6 pr-4">
+          {/* NAME */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
-              id="firstName"
-              maxLength={MAX_NAME_LENGTH}
+              className="h-11 w-full rounded-lg border px-3 text-sm"
+              placeholder="First Name"
               value={values.firstName}
-              onChange={(e) => setField("firstName", e.target.value)}
-              placeholder="Enter first name"
+              onChange={(e) =>
+                setValues({ ...values, firstName: e.target.value })
+              }
             />
-            {errors.firstName ? (
-              <p className={errorClass}>{errors.firstName}</p>
-            ) : null}
+            <Input
+              className="h-11 w-full rounded-lg border px-3 text-sm"
+              placeholder="Last Name"
+              value={values.lastName}
+              onChange={(e) =>
+                setValues({ ...values, lastName: e.target.value })
+              }
+            />
           </div>
 
-          <div className={fieldClass}>
-            <label className={labelClass} htmlFor="lastName">
-              Last Name
+          {/* EMAIL */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="user-email"
+              className="text-sm font-medium text-cs-heading"
+            >
+              Email
             </label>
             <Input
-              id="lastName"
-              maxLength={MAX_NAME_LENGTH}
-              value={values.lastName}
-              onChange={(e) => setField("lastName", e.target.value)}
-              placeholder="Enter last name"
+              id="user-email"
+              className="h-11 w-full rounded-lg border px-3 text-sm"
+              placeholder="Enter email"
+              value={values.email}
+              onChange={(e) => setValues({ ...values, email: e.target.value })}
             />
-            {errors.lastName ? (
-              <p className={errorClass}>{errors.lastName}</p>
-            ) : null}
           </div>
-        </div>
 
-        <div className={fieldClass}>
-          <label className={labelClass} htmlFor="email">
-            Email
-          </label>
-          <Input
-            id="email"
-            type="email"
-            value={values.email}
-            onChange={(e) => setField("email", e.target.value)}
-            placeholder="name@company.com"
-          />
-          {errors.email ? <p className={errorClass}>{errors.email}</p> : null}
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className={fieldClass}>
-            <label className={labelClass} htmlFor="role">
-              Role
+          {/* DESIGNATION */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="user-designation"
+              className="text-sm font-medium text-cs-heading"
+            >
+              Designation
             </label>
             <select
-              id="role"
-              value={values.role}
-              onChange={(e) => setField("role", e.target.value as UserRole)}
-              className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-cs-primary-100/30 focus-visible:outline-none"
+              id="user-designation"
+              value={values.designation}
+              onChange={(e) =>
+                setValues({ ...values, designation: e.target.value })
+              }
+              className="h-11 w-full rounded-lg border px-3 text-sm"
             >
-              <option value="Admin">Admin</option>
-              <option value="BA">BA</option>
-              <option value="Employee">Employee</option>
+              <option value="">Select Designation</option>
+              {DESIGNATIONS.map((d) => (
+                <option key={d}>{d}</option>
+              ))}
             </select>
-            {errors.role ? <p className={errorClass}>{errors.role}</p> : null}
           </div>
 
-          <div className={fieldClass}>
-            <span className={labelClass}>Status</span>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant={values.status === "Active" ? "default" : "secondary"}
-                className="h-10 px-4"
-                onClick={() => setField("status", "Active")}
-              >
-                Active
-              </Button>
-              <Button
-                type="button"
-                variant={
-                  values.status === "Deactivated" ? "default" : "secondary"
-                }
-                className="h-10 px-4"
-                onClick={() => setField("status", "Deactivated")}
-              >
-                Deactivated
-              </Button>
-            </div>
+          {/* DEV TYPE */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="user-developer-type"
+              className="text-sm font-medium text-cs-heading"
+            >
+              Developer Type
+            </label>
+            <select
+              id="user-developer-type"
+              value={values.developerType}
+              onChange={(e) =>
+                setValues({ ...values, developerType: e.target.value })
+              }
+              className="h-11 w-full rounded-lg border px-3 text-sm"
+            >
+              <option value="">Select Developer Type</option>
+              {DEV_TYPES.map((d) => (
+                <option key={d}>{d}</option>
+              ))}
+            </select>
           </div>
+
+          {/* TECH STACK MULTI SELECT */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="user-tech-stack"
+              className="text-sm font-medium text-cs-heading"
+            >
+              Tech Stack
+            </label>
+
+            <select
+              id="user-tech-stack"
+              multiple
+              value={values.techStack}
+              onChange={(e) => {
+                const selectedOptions = Array.from(
+                  e.target.selectedOptions,
+                ).map((option) => option.value);
+
+                setValues({ ...values, techStack: selectedOptions });
+              }}
+              className="min-h-[120px] w-full rounded-lg border px-3 py-2 text-sm"
+            >
+              {TECH_STACK.map((tech) => (
+                <option key={tech} value={tech}>
+                  {tech}
+                </option>
+              ))}
+            </select>
+
+            {/* Selected Tags */}
+            {values.techStack.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {values.techStack.map((tech) => (
+                  <span
+                    key={tech}
+                    className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-full"
+                  >
+                    {tech}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* PASSWORD */}
+          {mode === "create" && (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="user-password"
+                className="text-sm font-medium text-cs-heading"
+              >
+                Password
+              </label>
+              <PasswordInput
+                id="user-password"
+                className="h-11 w-full rounded-lg border px-3 text-sm"
+                placeholder="Enter password (min. 6 characters)"
+                value={values.password}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setValues({ ...values, password: e.target.value })
+                }
+              />
+              <p className="text-xs text-gray-500">
+                Password must be at least 6 characters.
+              </p>
+            </div>
+          )}
         </div>
 
-        {(mode === "create" || values.resetPassword) && (
-          <div className={fieldClass}>
-            <label className={labelClass} htmlFor="password">
-              {mode === "create" ? "Password" : "New Password"}
-            </label>
-            <PasswordInput
-              id="password"
-              value={values.password}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setField("password", e.target.value)
-              }
-              placeholder="Minimum 6 characters"
-            />
-            {errors.password ? (
-              <p className={errorClass}>{errors.password}</p>
-            ) : null}
-          </div>
-        )}
-
-        {mode === "edit" ? (
-          <label className="flex items-center gap-2 text-sm text-cs-text">
-            <input
-              type="checkbox"
-              checked={values.resetPassword}
-              onChange={(e) => setField("resetPassword", e.target.checked)}
-              className="h-4 w-4 rounded border-input text-cs-primary-100 focus:ring-cs-primary-100/30"
-            />
-            Reset password
-          </label>
-        ) : null}
-
-        <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+        {/* ACTIONS */}
+        <div className="flex shrink-0 justify-end gap-2 border-t border-gray-100 bg-white px-6 py-4">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
           <Button type="submit">
-            {mode === "create" ? "Create User" : "Save Changes"}
+            {mode === "create" ? "Create" : "Update"}
           </Button>
         </div>
       </form>

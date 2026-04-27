@@ -41,19 +41,21 @@ export default function Toast({ toast, onClose }: ToastProps) {
   return (
     <output
       className={cn(
-        "pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border p-4 shadow-lg",
+        "pointer-events-auto flex w-full max-w-sm flex-nowrap items-center gap-3 rounded-xl border p-4 shadow-lg",
         "animate-in slide-in-from-top-5 fade-in-50 duration-300",
         style.container,
       )}
       aria-live="polite"
     >
-      <div className="mt-0.5">{style.icon}</div>
-      <p className="ui-body flex-1">{toast.message}</p>
+      <div className="shrink-0">{style.icon}</div>
+      <p className="ui-body min-w-0 flex-1 truncate whitespace-nowrap">
+        {toast.message}
+      </p>
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="h-7 w-7 rounded-lg text-current/70 hover:bg-black/5 hover:text-current"
+        className="h-7 w-7 shrink-0 rounded-lg text-current/70 hover:bg-black/5 hover:text-current"
         onClick={() => onClose(toast.id)}
         aria-label="Close notification"
       >
