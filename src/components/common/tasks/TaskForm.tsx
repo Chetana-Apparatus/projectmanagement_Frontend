@@ -6,7 +6,13 @@ import type { Task } from "@/components/common/tasks/TaskTable";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
-const statuses = ["Not Started", "Pending", "In Progress", "Completed"];
+const statuses = [
+  "Not Started",
+  "In Progress",
+  "Paused",
+  "Stopped",
+  "Completed",
+] as const;
 
 type EmployeeOption = {
   id: string;
@@ -24,7 +30,15 @@ type MilestoneOption = {
   projectId: string;
 };
 
-export type TaskFormValues = Omit<Task, "id" | "employee">;
+export type TaskFormValues = {
+  name: string;
+  project: string;
+  milestone: string;
+  assignedBy: string;
+  startDate: string;
+  endDate: string;
+  status: Task["status"];
+};
 
 type TaskFormProps = {
   initial?: Task | null;

@@ -1,50 +1,44 @@
 "use client";
 
-import { Progress, Table, type TableColumnsType } from "antd";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Plus, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import MilestoneForm, {
   type MilestoneFormValues,
   type SelectOption,
 } from "@/components/common/milestones/MilestoneForm";
-import type { MilestoneRecord } from "@/components/common/milestones/MilestoneTable";
+import MilestoneTable, {
+  type MilestoneRecord,
+} from "@/components/common/milestones/MilestoneTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
-import { calculateProgress, getProgressColor } from "@/utils/progress";
+import {
+  type ApiMilestone,
+  type ApiProject,
+  apiMilestoneToRecord,
+} from "@/lib/admin-mappers";
+import {
+  drfDelete,
+  drfFormDataPatch,
+  drfFormDataPost,
+  fetchAllPages,
+} from "@/lib/pms-http";
 
-const projects: SelectOption[] = [
-  { id: "prj-101", label: "Project Atlas" },
-  { id: "prj-102", label: "Project Beacon" },
-  { id: "prj-103", label: "Project Horizon" },
-];
-
-const seededMilestones: MilestoneRecord[] = [
-  {
-    id: "ms-1",
-    projectId: "prj-101",
-    name: "Requirements Sign-off",
-    startDate: "2026-04-05",
-    endDate: "2026-04-12",
-    deadline: "2026-04-14",
-    assignedEmployees: ["Ava Patel", "Ethan Wilson"],
-    watchers: ["Sophia Turner"],
-  },
-  {
-    id: "ms-2",
-    projectId: "prj-102",
-    name: "UI Prototype Completion",
-    startDate: "2026-04-08",
-    endDate: "2026-04-18",
-    deadline: "2026-04-20",
-    assignedEmployees: ["Noah Sharma", "Mia Santos", "Liam Johnson"],
-    watchers: ["Oliver Khan", "Aria Singh"],
-  },
-];
+function milestoneFormToFormData(values: MilestoneFormValues): FormData {
+  const fd = new FormData();
+  fd.append("project", values.projectId);
+  fd.append("name", values.name.trim());
+  fd.append("description", values.description?.trim() ?? "");
+  fd.append("start_date", values.startDate);
+  fd.append("end_date", values.endDate);
+  return fd;
+}
 
 export default function BAMilestonesPage() {
   const { showToast } = useToast();
-  const [milestones, setMilestones] =
-    useState<MilestoneRecord[]>(seededMilestones);
+  const [projects, setProjects] = useState<SelectOption[]>([]);
+  const [milestones, setMilestones] = useState<MilestoneRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(
     null,
@@ -53,72 +47,44 @@ export default function BAMilestonesPage() {
     null,
   );
 
+  const reload = useCallback(async () => {
+    setLoadError(null);
+    setLoading(true);
+    try {
+      const [projectRows, milestoneRows] = await Promise.all([
+        fetchAllPages<ApiProject>("/api/v1/projects/"),
+        fetchAllPages<ApiMilestone>("/api/v1/milestones/"),
+      ]);
+      setProjects(
+        projectRows.map((project) => ({
+          id: String(project.id),
+          label: project.name,
+        })),
+      );
+      setMilestones(
+        milestoneRows.map((milestone) => apiMilestoneToRecord(milestone)),
+      );
+    } catch (e) {
+      setLoadError(
+        e instanceof Error ? e.message : "Failed to load milestones",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
   const projectNameMap = useMemo(
     () =>
       projects.reduce<Record<string, string>>((acc, project) => {
         acc[project.id] = project.label;
         return acc;
       }, {}),
-    [],
+    [projects],
   );
-  const columns: TableColumnsType<MilestoneRecord> = [
-    {
-      title: "PROJECT NAME",
-      dataIndex: "projectId",
-      key: "projectId",
-      render: (projectId: string) => projectNameMap[projectId] ?? projectId,
-    },
-    { title: "MILESTONE NAME", dataIndex: "name", key: "name" },
-    { title: "START DATE", dataIndex: "startDate", key: "startDate" },
-    { title: "END DATE", dataIndex: "endDate", key: "endDate" },
-    {
-      title: "PROGRESS",
-      key: "progress",
-      render: (_, row) => {
-        const percent = calculateProgress(row.startDate, row.endDate);
-        return (
-          <div className="min-w-[140px] max-w-[180px]">
-            <Progress
-              percent={percent}
-              strokeColor={getProgressColor(percent)}
-              size="small"
-              format={(value) => `${value ?? 0}%`}
-            />
-          </div>
-        );
-      },
-    },
-    {
-      title: "ACTIONS",
-      key: "actions",
-      align: "right",
-      render: (_, row) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            className="flex h-8 w-8 items-center justify-center border-sky-200 text-sky-600 hover:border-sky-200 hover:bg-sky-50"
-            onClick={() => {
-              setEditingMilestoneId(row.id);
-              setFormMode("edit");
-            }}
-            aria-label={`Edit milestone ${row.name}`}
-          >
-            <Pencil size={16} />
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="flex h-8 w-8 items-center justify-center border-red-200 text-red-600 hover:border-red-200 hover:bg-red-50"
-            onClick={() => setDeleteTarget(row)}
-            aria-label={`Delete milestone ${row.name}`}
-          >
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      ),
-    },
-  ];
 
   const editingMilestone = useMemo(
     () =>
@@ -132,9 +98,9 @@ export default function BAMilestonesPage() {
     return {
       projectId: editingMilestone.projectId,
       name: editingMilestone.name,
+      description: editingMilestone.description ?? "",
       startDate: editingMilestone.startDate,
       endDate: editingMilestone.endDate,
-      deadline: editingMilestone.deadline,
     };
   }, [editingMilestone]);
 
@@ -143,45 +109,50 @@ export default function BAMilestonesPage() {
     setEditingMilestoneId(null);
   };
 
-  const createRecordFromValues = (
-    id: string,
-    values: MilestoneFormValues,
-  ): MilestoneRecord => ({
-    id,
-    projectId: values.projectId,
-    name: values.name.trim(),
-    startDate: values.startDate,
-    endDate: values.endDate,
-    deadline: values.deadline,
-    assignedEmployees: [],
-    watchers: [],
-  });
-
   const handleCreate = (values: MilestoneFormValues) => {
-    const nextMilestone = createRecordFromValues(`ms-${Date.now()}`, values);
-    setMilestones((prev) => [nextMilestone, ...prev]);
-    showToast("Milestone created successfully", "success");
-    closeForm();
+    void (async () => {
+      try {
+        const fd = milestoneFormToFormData(values);
+        await drfFormDataPost<ApiMilestone>("/api/v1/milestones/", fd);
+        showToast("Milestone created successfully", "success");
+        closeForm();
+        await reload();
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Create failed", "error");
+      }
+    })();
   };
 
   const handleUpdate = (values: MilestoneFormValues) => {
     if (!editingMilestoneId) return;
-
-    const updatedMilestone = createRecordFromValues(editingMilestoneId, values);
-    setMilestones((prev) =>
-      prev.map((item) =>
-        item.id === editingMilestoneId ? updatedMilestone : item,
-      ),
-    );
-    showToast("Milestone updated successfully", "success");
-    closeForm();
+    void (async () => {
+      try {
+        const fd = milestoneFormToFormData(values);
+        await drfFormDataPatch<ApiMilestone>(
+          `/api/v1/milestones/${editingMilestoneId}/`,
+          fd,
+        );
+        showToast("Milestone updated successfully", "success");
+        closeForm();
+        await reload();
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Update failed", "error");
+      }
+    })();
   };
 
   const handleDelete = () => {
     if (!deleteTarget) return;
-    setMilestones((prev) => prev.filter((item) => item.id !== deleteTarget.id));
-    showToast("Milestone deleted successfully", "success");
-    setDeleteTarget(null);
+    void (async () => {
+      try {
+        await drfDelete(`/api/v1/milestones/${deleteTarget.id}/`);
+        showToast("Milestone deleted successfully", "success");
+        setDeleteTarget(null);
+        await reload();
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Delete failed", "error");
+      }
+    })();
   };
 
   useEffect(() => {
@@ -210,13 +181,17 @@ export default function BAMilestonesPage() {
         </Button>
       </div>
 
-      <Table<MilestoneRecord>
-        rowKey="id"
-        columns={columns}
-        dataSource={milestones}
-        bordered
-        pagination={{ pageSize: 5, showSizeChanger: false }}
-        scroll={{ x: 920 }}
+      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
+      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
+
+      <MilestoneTable
+        milestones={milestones}
+        projectNameMap={projectNameMap}
+        onEdit={(milestone) => {
+          setEditingMilestoneId(milestone.id);
+          setFormMode("edit");
+        }}
+        onDelete={(milestone) => setDeleteTarget(milestone)}
       />
 
       {formMode ? (

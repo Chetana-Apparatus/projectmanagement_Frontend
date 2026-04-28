@@ -18,6 +18,10 @@ export type UserRecord = {
   designation: string;
   developerType: string;
   techStack: string[];
+  /** Raw `tech_notes` from API (edit form). */
+  techNotes?: string;
+  /** Raw `tech_stack` enum from API when `tech_notes` is empty. */
+  apiTechStack?: string | null;
   role: UserRole;
   status: UserStatus;
 };
@@ -47,8 +51,33 @@ export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
       data={users}
       emptyMessage="No users found"
       renderers={{
+        firstName: (row) => (
+          <span className="break-words whitespace-normal">
+            {row.firstName || "-"}
+          </span>
+        ),
+        lastName: (row) => (
+          <span className="break-words whitespace-normal">
+            {row.lastName || "-"}
+          </span>
+        ),
+        email: (row) => (
+          <span className="break-all whitespace-normal">
+            {row.email || "-"}
+          </span>
+        ),
+        designation: (row) => (
+          <span className="break-words whitespace-normal">
+            {row.designation || "-"}
+          </span>
+        ),
+        developerType: (row) => (
+          <span className="break-words whitespace-normal">
+            {row.developerType || "-"}
+          </span>
+        ),
         techStack: (row) => (
-          <span className="line-clamp-1 max-w-[220px]">
+          <span className="break-words whitespace-normal">
             {row.techStack.length > 0 ? row.techStack.join(", ") : "-"}
           </span>
         ),

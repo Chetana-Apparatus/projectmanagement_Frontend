@@ -40,7 +40,8 @@ export default function DataTable<T extends Record<string, unknown>>({
           className: "px-6 py-4 text-xs font-semibold uppercase text-gray-500",
         }),
         onCell: () => ({
-          className: "px-6 py-4 text-sm text-gray-700",
+          className:
+            "px-6 py-4 align-top text-sm text-gray-700 whitespace-normal break-words",
         }),
         render: (_value: unknown, row: T) => {
           const value = row[column.key];

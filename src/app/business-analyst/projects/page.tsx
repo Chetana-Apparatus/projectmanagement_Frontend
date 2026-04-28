@@ -1,175 +1,160 @@
 "use client";
 
-import { Progress, Table, type TableColumnsType } from "antd";
-import { renderAsync } from "docx-preview";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import ProjectForm, {
   type ProjectFormValues,
 } from "@/components/common/projects/ProjectForm";
+import ProjectTable, {
+  type Project,
+} from "@/components/common/projects/ProjectTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
-import { calculateProgress, getProgressColor } from "@/utils/progress";
+import { type ApiProject, apiProjectToRow } from "@/lib/admin-mappers";
+import { apiFetch } from "@/lib/api-client";
+import {
+  drfFormDataPatch,
+  drfFormDataPost,
+  fetchAllPages,
+} from "@/lib/pms-http";
 
-type ProjectStatus = "Planned" | "In Progress" | "Completed";
-type Project = ProjectFormValues & {
-  id: string;
-  status: ProjectStatus;
-};
+function buildProjectFormData(values: ProjectFormValues): FormData {
+  const fd = new FormData();
+  fd.append("name", values.name.trim());
+  fd.append("description", values.description ?? "");
+  fd.append("start_date", values.startDate);
+  fd.append("deadline", values.endDate);
+  if (values.document) fd.append("document", values.document);
+  return fd;
+}
 
 export default function BAProjectsPage() {
   const { showToast } = useToast();
-
   const [projects, setProjects] = useState<Project[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
-  const [previewProject, setPreviewProject] = useState<Project | null>(null);
-  const [previewError, setPreviewError] = useState("");
-  const docxContainerRef = useRef<HTMLDivElement | null>(null);
+  const [editingOriginalEndDate, setEditingOriginalEndDate] =
+    useState<string>("");
+  const [pendingDeadlineRequest, setPendingDeadlineRequest] = useState<{
+    projectId: string;
+    values: ProjectFormValues;
+    requestedDeadline: string;
+  } | null>(null);
+  const [deadlineReason, setDeadlineReason] = useState("");
+  const [submittingDeadlineRequest, setSubmittingDeadlineRequest] =
+    useState(false);
 
-  const previewFile = previewProject?.document ?? null;
-  const isDocx = useMemo(
-    () => Boolean(previewFile?.name.toLowerCase().endsWith(".docx")),
-    [previewFile],
-  );
-  const isMarkdown = useMemo(
-    () => Boolean(previewFile?.name.toLowerCase().endsWith(".md")),
-    [previewFile],
-  );
+  const loadProjects = useCallback(async () => {
+    setLoadError(null);
+    setLoading(true);
+    try {
+      const rows = await fetchAllPages<ApiProject>("/api/v1/projects/");
+      setProjects(rows.map(apiProjectToRow));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load projects");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!open) return undefined;
+    void loadProjects();
+  }, [loadProjects]);
 
+  useEffect(() => {
+    const isModalOpen = open || Boolean(pendingDeadlineRequest);
+    if (!isModalOpen) return undefined;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "auto";
     };
-  }, [open]);
+  }, [open, pendingDeadlineRequest]);
 
-  useEffect(() => {
-    if (
-      !previewProject ||
-      !isDocx ||
-      !previewFile ||
-      !docxContainerRef.current
-    ) {
-      return;
-    }
-
-    const container = docxContainerRef.current;
-    container.innerHTML = "";
-    setPreviewError("");
-
-    let cancelled = false;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      if (cancelled || !container) return;
-      const result = reader.result;
-      if (!(result instanceof ArrayBuffer)) return;
-
-      try {
-        await renderAsync(result, container);
-      } catch (_error) {
-        setPreviewError("Unable to preview this DOCX file.");
-      }
-    };
-    reader.readAsArrayBuffer(previewFile);
-
-    return () => {
-      cancelled = true;
-      container.innerHTML = "";
-    };
-  }, [previewProject, isDocx, previewFile]);
-
-  const columns: TableColumnsType<Project> = [
-    {
-      title: "PROJECT",
-      dataIndex: "name",
-      key: "name",
-      render: (_, row) => (
-        <button
-          type="button"
-          onClick={() => setPreviewProject(row)}
-          className="text-left text-sky-700 underline underline-offset-2 hover:text-sky-900"
-        >
-          {row.name}
-        </button>
-      ),
-    },
-    { title: "START", dataIndex: "startDate", key: "startDate" },
-    { title: "END", dataIndex: "endDate", key: "endDate" },
-    {
-      title: "PROGRESS",
-      key: "progress",
-      render: (_, row) => {
-        const percent = calculateProgress(row.startDate, row.endDate);
-        return (
-          <div className="min-w-[140px] max-w-[180px]">
-            <Progress
-              percent={percent}
-              strokeColor={getProgressColor(percent)}
-              size="small"
-              format={(value) => `${value ?? 0}%`}
-            />
-          </div>
-        );
-      },
-    },
-    { title: "STATUS", dataIndex: "status", key: "status" },
-    {
-      title: "ACTIONS",
-      key: "actions",
-      align: "right",
-      render: (_, row) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            className="flex h-8 w-8 items-center justify-center border-sky-200 text-sky-600 hover:border-sky-200 hover:bg-sky-50"
-            onClick={() => {
-              setEditing(row);
-              setOpen(true);
-            }}
-            aria-label={`Edit project ${row.name}`}
-          >
-            <Pencil size={16} />
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="flex h-8 w-8 items-center justify-center border-red-200 text-red-600 hover:border-red-200 hover:bg-red-50"
-            onClick={() =>
-              setProjects((prev) => prev.filter((x) => x.id !== row.id))
-            }
-            aria-label={`Delete project ${row.name}`}
-          >
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  const handleSubmit = (values: ProjectFormValues) => {
-    if (editing) {
-      setProjects((prev) =>
-        prev.map((p) => (p.id === editing.id ? { ...p, ...values } : p)),
-      );
-      showToast("Updated", "success");
-    } else {
-      setProjects((prev) => [
-        {
-          id: Date.now().toString(),
-          ...values,
-          status: "Planned",
-        },
-        ...prev,
-      ]);
-      showToast("Created", "success");
-    }
-
+  const closeForm = () => {
     setOpen(false);
     setEditing(null);
+    setEditingOriginalEndDate("");
+  };
+
+  const submitDeadlineRequest = async () => {
+    if (!pendingDeadlineRequest) return;
+    setSubmittingDeadlineRequest(true);
+    try {
+      const { projectId, values, requestedDeadline } = pendingDeadlineRequest;
+      const reason =
+        deadlineReason.trim() || "Deadline adjustment requested by BA";
+      const req = await apiFetch<{ project_id: number }>(
+        `/api/v1/projects/${projectId}/request-deadline-change/`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            new_deadline: requestedDeadline,
+            reason,
+          }),
+        },
+      );
+      if (!req.success) {
+        throw new Error(req.message || "Deadline change request failed");
+      }
+      // Keep editable fields except deadline in normal BA update.
+      const fdWithoutDeadline = new FormData();
+      fdWithoutDeadline.append("name", values.name.trim());
+      fdWithoutDeadline.append("description", values.description ?? "");
+      fdWithoutDeadline.append("start_date", values.startDate);
+      if (values.document)
+        fdWithoutDeadline.append("document", values.document);
+      await drfFormDataPatch<ApiProject>(
+        `/api/v1/projects/${projectId}/`,
+        fdWithoutDeadline,
+      );
+      showToast("Project updated. Deadline request sent to admin.", "success");
+      await loadProjects();
+      setPendingDeadlineRequest(null);
+      setDeadlineReason("");
+      closeForm();
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "Deadline change request failed",
+        "error",
+      );
+    } finally {
+      setSubmittingDeadlineRequest(false);
+    }
+  };
+
+  const handleSubmit = async (values: ProjectFormValues) => {
+    try {
+      const fd = buildProjectFormData(values);
+      if (editing) {
+        const requestedDeadline = values.endDate;
+        if (
+          editingOriginalEndDate &&
+          requestedDeadline !== editingOriginalEndDate
+        ) {
+          setPendingDeadlineRequest({
+            projectId: editing.id,
+            values,
+            requestedDeadline,
+          });
+          return;
+        } else {
+          await drfFormDataPatch<ApiProject>(
+            `/api/v1/projects/${editing.id}/`,
+            fd,
+          );
+          showToast("Project updated", "success");
+        }
+      } else {
+        await drfFormDataPost<ApiProject>("/api/v1/projects/", fd);
+        showToast("Project created", "success");
+      }
+      await loadProjects();
+      closeForm();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Save failed", "error");
+    }
   };
 
   return (
@@ -181,13 +166,17 @@ export default function BAProjectsPage() {
         </Button>
       </div>
 
-      <Table<Project>
-        rowKey="id"
-        columns={columns}
-        dataSource={projects}
-        bordered
-        pagination={{ pageSize: 5, showSizeChanger: false }}
-        scroll={{ x: 980 }}
+      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
+      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
+
+      <ProjectTable
+        projects={projects}
+        allowDelete={false}
+        onEdit={(project) => {
+          setEditing(project);
+          setEditingOriginalEndDate(project.endDate);
+          setOpen(true);
+        }}
       />
 
       {open && (
@@ -195,115 +184,78 @@ export default function BAProjectsPage() {
           <button
             type="button"
             className="absolute inset-0"
-            onClick={() => setOpen(false)}
+            onClick={closeForm}
             aria-label="Close modal"
           />
 
           <div className="relative z-[101] w-full max-w-xl">
             <div className="mb-2 flex justify-end">
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={() => setOpen(false)}
-              >
+              <Button variant="secondary" size="icon" onClick={closeForm}>
                 <X size={16} />
               </Button>
             </div>
 
             <ProjectForm
-              initialValues={editing || undefined}
+              initialValues={
+                editing
+                  ? {
+                      name: editing.name,
+                      description: editing.description,
+                      startDate: editing.startDate,
+                      endDate: editing.endDate,
+                      document: null,
+                    }
+                  : undefined
+              }
               onSubmit={handleSubmit}
-              onCancel={() => setOpen(false)}
+              onCancel={closeForm}
             />
           </div>
         </div>
       )}
 
-      {previewProject ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      {pendingDeadlineRequest ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/45 p-4">
           <button
             type="button"
             className="absolute inset-0"
-            onClick={() => setPreviewProject(null)}
-            aria-label="Close document preview"
+            onClick={() => setPendingDeadlineRequest(null)}
+            aria-label="Close deadline request reason modal"
           />
-
-          <div className="relative z-[121] flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <div className="min-w-0">
-                <h3 className="text-base font-semibold">
-                  Project Document Preview
-                </h3>
-                <p className="truncate text-xs text-gray-500">
-                  {previewProject.name}
-                  {previewFile
-                    ? ` - ${previewFile.name}`
-                    : " - No document uploaded"}
-                </p>
-              </div>
+          <div className="relative z-[131] w-full max-w-lg rounded-xl border border-border bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-cs-heading">
+              Deadline Change Request
+            </h2>
+            <p className="mt-1 text-sm text-cs-text">
+              Provide a reason to request deadline change from Admin.
+            </p>
+            <textarea
+              value={deadlineReason}
+              onChange={(e) => setDeadlineReason(e.target.value)}
+              rows={4}
+              className="mt-3 w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cs-primary-100/40"
+              placeholder="Reason for deadline change"
+            />
+            <div className="mt-4 flex justify-end gap-2">
               <Button
                 type="button"
                 variant="secondary"
-                size="icon"
-                onClick={() => setPreviewProject(null)}
+                onClick={() => setPendingDeadlineRequest(null)}
+                disabled={submittingDeadlineRequest}
               >
-                <X size={16} />
+                Cancel
               </Button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-auto bg-gray-50 p-4">
-              {!previewFile ? (
-                <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-500">
-                  No document uploaded for this project.
-                </div>
-              ) : null}
-
-              {isDocx ? (
-                <div className="h-full min-h-[300px] rounded-lg border border-gray-200 bg-white p-4">
-                  {previewError ? (
-                    <p className="text-sm text-red-600">{previewError}</p>
-                  ) : (
-                    <div
-                      ref={docxContainerRef}
-                      className="docx-preview-container mx-auto h-full max-w-3xl overflow-auto"
-                    />
-                  )}
-                </div>
-              ) : null}
-
-              {isMarkdown && previewFile ? (
-                <BAMarkdownPreview file={previewFile} />
-              ) : null}
+              <Button
+                type="button"
+                onClick={() => void submitDeadlineRequest()}
+                disabled={submittingDeadlineRequest}
+              >
+                {submittingDeadlineRequest ? "Sending..." : "Send Request"}
+              </Button>
             </div>
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function BAMarkdownPreview({ file }: { file: File }) {
-  const [content, setContent] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (cancelled) return;
-      setContent(typeof reader.result === "string" ? reader.result : "");
-    };
-    reader.readAsText(file);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [file]);
-
-  return (
-    <div className="h-full min-h-[300px] rounded-lg border border-gray-200 bg-white p-4">
-      <pre className="whitespace-pre-wrap break-words text-sm text-gray-800">
-        {content}
-      </pre>
     </div>
   );
 }

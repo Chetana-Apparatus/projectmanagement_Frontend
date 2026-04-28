@@ -75,8 +75,10 @@ export default function Sidebar({
 
         <nav className="space-y-1 p-3">
           {items.map((item) => {
-            const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isDashboardRoot = item.href === "/business-analyst";
+            const isActive = isDashboardRoot
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
 
             return (

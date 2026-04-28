@@ -61,5 +61,6 @@ export const SIDEBAR_ITEMS: Record<UserRole, SidebarItem[]> = {
     { label: "Dashboard", href: "/employee", icon: LayoutDashboard },
     { label: " My Tasks", href: "/employee/tasks", icon: ClipboardList },
     { label: "Work History", href: "/employee/work-history", icon: Briefcase },
+    { label: "Settings", href: "/employee/settings", icon: Settings },
   ],
 };

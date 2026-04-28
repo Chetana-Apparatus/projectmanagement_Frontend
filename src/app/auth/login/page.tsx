@@ -8,14 +8,40 @@ import { useToast } from "@/components/common/toast/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/passwordInput";
+import { apiUrl } from "@/lib/api-base";
+import { messageFromUnknownBody, routeForRole } from "@/lib/api-client";
+import { persistSession } from "@/lib/auth-storage";
 
-type UserRole = "admin" | "BA" | "Employee";
-
-const roleRedirectMap: Record<UserRole, string> = {
-  admin: "/admin/dashboard",
-  BA: "/business-analyst",
-  Employee: "/employee",
+type LoginEnvelope = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    access: string;
+    refresh: string;
+    user: {
+      id: number;
+      email: string;
+      first_name?: string;
+      last_name?: string;
+      role: string | null;
+    };
+  };
 };
+
+function isLoginEnvelopeSuccess(body: unknown): body is LoginEnvelope & {
+  success: true;
+  data: NonNullable<LoginEnvelope["data"]>;
+} {
+  if (!body || typeof body !== "object") return false;
+  const b = body as LoginEnvelope;
+  return Boolean(
+    b.success &&
+      b.data?.access &&
+      b.data.refresh &&
+      b.data.user?.id !== undefined &&
+      b.data.user.email,
+  );
+}
 
 const LoginPage = () => {
   const router = useRouter();
@@ -24,17 +50,6 @@ const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const getRoleFromEmail = (value: string): UserRole => {
-    const normalized = value.trim().toLowerCase();
-
-    if (normalized.includes("admin")) return "admin";
-    if (normalized.includes("ba")) return "BA";
-
-    return "Employee";
-  };
-
-  const isAdmin = getRoleFromEmail(email) === "admin";
 
   const validateForm = () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -52,7 +67,7 @@ const LoginPage = () => {
     return "";
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const validationError = validateForm();
@@ -62,17 +77,46 @@ const LoginPage = () => {
     }
 
     setLoading(true);
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const res = await fetch(apiUrl("/api/v1/auth/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+        }),
+        cache: "no-store",
+      });
 
-    setTimeout(() => {
+      const body = (await res.json()) as
+        | LoginEnvelope
+        | Record<string, unknown>;
+
+      if (res.ok && isLoginEnvelopeSuccess(body)) {
+        const { access, refresh, user } = body.data;
+        persistSession({
+          access,
+          refresh,
+          user: {
+            id: user.id,
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            role: user.role ?? null,
+          },
+        });
+        showToast("Signed in successfully", "success");
+        router.replace(routeForRole(user.role));
+        return;
+      }
+
+      showToast(messageFromUnknownBody(body), "error");
+    } catch {
+      showToast("Could not reach the server. Is the API running?", "error");
+    } finally {
       setLoading(false);
-
-      const userRole = getRoleFromEmail(email);
-      const targetRoute = roleRedirectMap[userRole] ?? "/";
-      window.localStorage.setItem("user_role", userRole);
-      showToast("Signed in successfully", "success");
-
-      router.push(targetRoute);
-    }, 1000);
+    }
   };
 
   return (
@@ -130,12 +174,9 @@ const LoginPage = () => {
           </form>
         </Card>
 
-        {/* Show forgot-password for admin login */}
-        {isAdmin && (
-          <Link href="/auth/forgot-password" className="link mt-4">
-            Forgot password?
-          </Link>
-        )}
+        <Link href="/auth/forgot-password" className="link mt-4">
+          Forgot password? (Admin OTP)
+        </Link>
       </div>
     </div>
   );

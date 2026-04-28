@@ -1,12 +1,11 @@
 "use client";
 
-import { Progress } from "antd";
 import { Pencil, Trash2 } from "lucide-react";
+import Link from "next/link";
 import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
 import Button from "@/components/ui/Button";
-import { calculateProgress, getProgressColor } from "@/utils/progress";
 
 export type Task = {
   id: string;
@@ -17,12 +16,13 @@ export type Task = {
   assignedBy: string;
   startDate: string;
   endDate: string;
-  status: "Not Started" | "Pending" | "In Progress" | "Completed";
+  status: "Not Started" | "In Progress" | "Completed" | "Paused" | "Stopped";
 };
 
 type TaskTableProps = {
   tasks: Task[];
   projectNameMap?: Record<string, string>;
+  projectHrefMap?: Record<string, string>;
   milestoneNameMap?: Record<string, string>;
   assignedByNameMap?: Record<string, string>;
   onEdit?: (task: Task) => void;
@@ -32,17 +32,34 @@ type TaskTableProps = {
 export default function TaskTable({
   tasks,
   projectNameMap = {},
+  projectHrefMap = {},
   milestoneNameMap = {},
   assignedByNameMap = {},
   onEdit,
   onDelete,
 }: TaskTableProps) {
+  const progressBadge = (status: Task["status"]) => {
+    const styleMap: Record<Task["status"], string> = {
+      Completed: "bg-emerald-100 text-emerald-700",
+      "In Progress": "bg-blue-100 text-blue-700",
+      Paused: "bg-amber-100 text-amber-700",
+      Stopped: "bg-rose-100 text-rose-700",
+      "Not Started": "bg-slate-100 text-slate-700",
+    };
+    return (
+      <span
+        className={`rounded-full px-2 py-0.5 text-xs font-medium ${styleMap[status]}`}
+      >
+        {status}
+      </span>
+    );
+  };
+
   const columns: DataTableColumn[] = [
     { label: "Task Name", key: "name" },
     { label: "Project", key: "project" },
     { label: "Milestone", key: "milestone" },
-    { label: "Assigned By", key: "assignedBy" },
-    { label: "Status", key: "status" },
+    { label: "Assigned Employee", key: "employee" },
     { label: "Start Date", key: "startDate" },
     { label: "End Date", key: "endDate" },
     { label: "Progress", key: "progress" },
@@ -55,23 +72,28 @@ export default function TaskTable({
       data={tasks}
       emptyMessage="No tasks found"
       renderers={{
-        project: (row) => projectNameMap[row.project] ?? row.project,
-        milestone: (row) => milestoneNameMap[row.milestone] ?? row.milestone,
-        assignedBy: (row) =>
-          assignedByNameMap[row.assignedBy] ?? row.assignedBy,
-        progress: (row) => {
-          const percent = calculateProgress(row.startDate, row.endDate);
-
+        project: (row) => {
+          const label = projectNameMap[row.project] ?? row.project;
+          const href = projectHrefMap[row.project];
+          if (!href) return label;
           return (
-            <div className="min-w-[140px] max-w-[180px]">
-              <Progress
-                percent={percent}
-                strokeColor={getProgressColor(percent)}
-                size="small"
-                format={(value) => `${value ?? 0}%`}
-              />
+            <div className="flex flex-col">
+              <span>{label}</span>
+              <Link
+                href={href}
+                className="text-xs text-sky-700 underline underline-offset-2 hover:text-sky-900"
+              >
+                Open Project
+              </Link>
             </div>
           );
+        },
+        milestone: (row) => milestoneNameMap[row.milestone] ?? row.milestone,
+        employee: (row) =>
+          row.employee || assignedByNameMap[row.assignedBy] || "-",
+        status: (row) => progressBadge(row.status),
+        progress: (row) => {
+          return progressBadge(row.status);
         },
         actions: (row) => (
           <div className="flex items-center justify-end gap-2">

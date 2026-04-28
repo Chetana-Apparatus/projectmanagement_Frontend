@@ -1,90 +1,147 @@
 "use client";
 
-import { Progress, Table, type TableColumnsType } from "antd";
 import { Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import TaskForm, {
   type TaskFormValues,
 } from "@/components/common/tasks/TaskForm";
-import type { Task } from "@/components/common/tasks/TaskTable";
+import TaskTable, { type Task } from "@/components/common/tasks/TaskTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
-import { calculateProgress, getProgressColor } from "@/utils/progress";
+import {
+  type ApiMilestone,
+  type ApiProject,
+  type ApiTask,
+  type ApiUser,
+  apiTaskToRow,
+  buildTaskFormData,
+} from "@/lib/admin-mappers";
+import {
+  drfDelete,
+  drfFormDataPatch,
+  drfFormDataPost,
+  fetchAllPages,
+} from "@/lib/pms-http";
 
 export default function BATasksPage() {
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
-  const employees = [
-    { id: "emp-1", name: "Anita Sharma" },
-    { id: "emp-2", name: "Ravi Verma" },
-    { id: "emp-3", name: "Nisha Gupta" },
-    { id: "emp-4", name: "Karan Singh" },
-  ];
-  const employeeNameById = Object.fromEntries(
-    employees.map((employee) => [employee.id, employee.name]),
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [milestones, setMilestones] = useState<
+    { id: string; name: string; projectId: string }[]
+  >([]);
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>(
+    [],
+  );
+  const [employeeNameById, setEmployeeNameById] = useState<
+    Record<string, string>
+  >({});
+
+  const load = useCallback(async () => {
+    setLoadError(null);
+    setLoading(true);
+    try {
+      const [userRows, projectRows, milestoneRows, taskRows] =
+        await Promise.all([
+          fetchAllPages<ApiUser>("/api/v1/users/"),
+          fetchAllPages<ApiProject>("/api/v1/projects/"),
+          fetchAllPages<ApiMilestone>("/api/v1/milestones/"),
+          fetchAllPages<ApiTask>("/api/v1/tasks/"),
+        ]);
+
+      const names: Record<string, string> = {};
+      for (const u of userRows) {
+        names[String(u.id)] =
+          `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email;
+      }
+      setEmployeeNameById(names);
+      setEmployees(
+        userRows
+          .filter((u) => u.role === "EMPLOYEE")
+          .map((u) => ({
+            id: String(u.id),
+            name:
+              `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email,
+          })),
+      );
+      setProjects(projectRows.map((p) => ({ id: String(p.id), name: p.name })));
+      setMilestones(
+        milestoneRows.map((m) => ({
+          id: String(m.id),
+          name: m.name,
+          projectId: String(m.project),
+        })),
+      );
+      setTasks(taskRows.map(apiTaskToRow));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load tasks");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const projectNameById = useMemo(
+    () =>
+      Object.fromEntries(projects.map((project) => [project.id, project.name])),
+    [projects],
+  );
+  const projectHrefMap = useMemo(
+    () =>
+      Object.fromEntries(
+        projects.map((project) => [
+          project.id,
+          `/business-analyst/projects/${project.id}`,
+        ]),
+      ),
+    [projects],
+  );
+  const milestoneNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        milestones.map((milestone) => [milestone.id, milestone.name]),
+      ),
+    [milestones],
   );
 
-  const columns: TableColumnsType<Task> = [
-    { title: "TASK NAME", dataIndex: "name", key: "name" },
-    {
-      title: "ASSIGNED BY",
-      dataIndex: "assignedBy",
-      key: "assignedBy",
-      render: (assignedBy: string) =>
-        employeeNameById[assignedBy] ?? assignedBy,
-    },
-    { title: "STATUS", dataIndex: "status", key: "status" },
-    { title: "START DATE", dataIndex: "startDate", key: "startDate" },
-    { title: "END DATE", dataIndex: "endDate", key: "endDate" },
-    {
-      title: "PROGRESS",
-      key: "progress",
-      render: (_, row) => {
-        const percent = calculateProgress(row.startDate, row.endDate);
-        return (
-          <div className="min-w-[140px] max-w-[180px]">
-            <Progress
-              percent={percent}
-              strokeColor={getProgressColor(percent)}
-              size="small"
-              format={(value) => `${value ?? 0}%`}
-            />
-          </div>
-        );
-      },
-    },
-  ];
-
-  const handleSubmit = (data: TaskFormValues) => {
-    // Backend should derive watcher from logged-in BA session.
-    // Frontend sends assignedBy only; watcher is intentionally omitted.
-    if (editing) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === editing.id ? { ...t, ...data, employee: t.employee } : t,
-        ),
-      );
-      showToast("Task updated successfully", "success");
-    } else {
-      setTasks((prev) => [
-        {
-          ...data,
-          id: Date.now().toString(),
-          employee: "",
-        },
-        ...prev,
-      ]);
-      showToast("Task created successfully", "success");
+  const handleSubmit = async (data: TaskFormValues) => {
+    try {
+      const fd = buildTaskFormData(data);
+      if (editing) {
+        await drfFormDataPatch<ApiTask>(`/api/v1/tasks/${editing.id}/`, fd);
+        showToast("Task updated successfully", "success");
+      } else {
+        await drfFormDataPost<ApiTask>("/api/v1/tasks/", fd);
+        showToast("Task created successfully", "success");
+      }
+      closeModal();
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Save failed", "error");
     }
-
-    closeModal();
   };
 
   const closeModal = () => {
     setOpen(false);
     setEditing(null);
+  };
+
+  const handleDelete = async (task: Task) => {
+    if (!confirm(`Delete task “${task.name}”?`)) return;
+    try {
+      await drfDelete(`/api/v1/tasks/${task.id}/`);
+      showToast("Task deleted successfully", "success");
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Delete failed", "error");
+    }
   };
 
   useEffect(() => {
@@ -104,15 +161,22 @@ export default function BATasksPage() {
           <Plus size={16} /> Add Task
         </Button>
       </div>
+      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
+      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
 
-      <Table<Task>
-        rowKey="id"
-        columns={columns}
-        dataSource={tasks}
-        bordered
-        locale={{ emptyText: "No tasks found" }}
-        pagination={{ pageSize: 5, showSizeChanger: false }}
-        scroll={{ x: 760 }}
+      <TaskTable
+        tasks={tasks}
+        projectNameMap={projectNameById}
+        projectHrefMap={projectHrefMap}
+        milestoneNameMap={milestoneNameById}
+        assignedByNameMap={employeeNameById}
+        onEdit={(task) => {
+          setEditing(task);
+          setOpen(true);
+        }}
+        onDelete={(task) => {
+          void handleDelete(task);
+        }}
       />
 
       {open && (
@@ -134,6 +198,8 @@ export default function BATasksPage() {
               <TaskForm
                 initial={editing}
                 employees={employees}
+                projects={projects}
+                milestones={milestones}
                 showAssignedBy
                 onSubmit={handleSubmit}
                 onCancel={closeModal}

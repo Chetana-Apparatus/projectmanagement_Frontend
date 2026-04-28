@@ -13,9 +13,9 @@ export type SelectOption = {
 export type MilestoneFormValues = {
   projectId: string;
   name: string;
+  description: string;
   startDate: string;
   endDate: string;
-  deadline: string;
 };
 
 type MilestoneFormProps = {
@@ -31,9 +31,9 @@ type FormErrors = Partial<Record<keyof MilestoneFormValues, string>>;
 const emptyForm: MilestoneFormValues = {
   projectId: "",
   name: "",
+  description: "",
   startDate: "",
   endDate: "",
-  deadline: "",
 };
 
 export default function MilestoneForm({
@@ -70,7 +70,6 @@ export default function MilestoneForm({
     if (!values.name.trim()) nextErrors.name = "Milestone name is required";
     if (!values.startDate) nextErrors.startDate = "Start date is required";
     if (!values.endDate) nextErrors.endDate = "End date is required";
-    if (!values.deadline) nextErrors.deadline = "Deadline is required";
 
     if (
       values.startDate &&
@@ -78,10 +77,6 @@ export default function MilestoneForm({
       values.endDate < values.startDate
     ) {
       nextErrors.endDate = "End date cannot be before start date";
-    }
-
-    if (values.endDate && values.deadline && values.deadline < values.endDate) {
-      nextErrors.deadline = "Deadline cannot be before end date";
     }
 
     setErrors(nextErrors);
@@ -160,8 +155,21 @@ export default function MilestoneForm({
             {errors.name && <p className={errorClass}>{errors.name}</p>}
           </div>
 
+          <div className={fieldClass}>
+            <label htmlFor="milestone-description" className={labelClass}>
+              Description
+            </label>
+            <textarea
+              id="milestone-description"
+              className="min-h-[90px] w-full rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cs-primary-100/30"
+              value={values.description}
+              onChange={(e) => setField("description", e.target.value)}
+              placeholder="Enter milestone description"
+            />
+          </div>
+
           {/* DATES */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className={fieldClass}>
               <label htmlFor="milestone-start-date" className={labelClass}>
                 Start Date
@@ -190,22 +198,6 @@ export default function MilestoneForm({
                 onChange={(e) => setField("endDate", e.target.value)}
               />
               {errors.endDate && <p className={errorClass}>{errors.endDate}</p>}
-            </div>
-
-            <div className={fieldClass}>
-              <label htmlFor="milestone-deadline" className={labelClass}>
-                Deadline
-              </label>
-              <Input
-                id="milestone-deadline"
-                className="h-11 w-full rounded-lg border px-3 text-sm"
-                type="date"
-                value={values.deadline}
-                onChange={(e) => setField("deadline", e.target.value)}
-              />
-              {errors.deadline && (
-                <p className={errorClass}>{errors.deadline}</p>
-              )}
             </div>
           </div>
         </div>

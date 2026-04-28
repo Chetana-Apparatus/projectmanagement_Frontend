@@ -1,12 +1,11 @@
 "use client";
 
-import { Progress } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
 import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
-import { calculateProgress, getProgressColor } from "@/utils/progress";
+import { fetchWorkTracking } from "@/lib/admin-dashboard-api";
 
 type WorkLog = {
   id: string;
@@ -14,188 +13,103 @@ type WorkLog = {
   project: string;
   milestone: string;
   task: string;
-  status: "running" | "paused" | "stopped" | "auto-stopped" | "delayed";
+  status: WorkLogUiStatus;
   startDate: string;
   endDate: string;
   startTime: string;
   totalTime: string;
+  taskStatus?: string;
 };
 
-const mockLogs: WorkLog[] = [
-  {
-    id: "1",
-    employee: "Chetana",
-    project: "Website Synap",
-    milestone: "UI Design",
-    task: "Dashboard UI",
-    status: "auto-stopped",
-    startDate: "2026-04-01",
-    endDate: "2026-04-30",
-    startTime: "10:00 AM",
-    totalTime: "2h 15m",
-  },
-  {
-    id: "2",
-    employee: "Pratik",
-    project: "Backend Website Synap",
-    milestone: "API",
-    task: "Login API",
-    status: "stopped",
-    startDate: "2026-04-10",
-    endDate: "2026-05-15",
-    startTime: "11:30 AM",
-    totalTime: "1h 10m",
-  },
-  {
-    id: "3",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "4",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "5",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "6",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "7",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "8",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "9",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "10",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-  {
-    id: "11",
-    employee: "Jyotsna",
-    project: "Website Nag Foundation",
-    milestone: "Frontend",
-    task: "Home Page",
-    status: "running",
-    startDate: "2026-04-15",
-    endDate: "2026-06-01",
-    startTime: "09:00 AM",
-    totalTime: "3h 30m",
-  },
-];
+type WorkLogUiStatus =
+  | "not-started"
+  | "started"
+  | "running"
+  | "paused"
+  | "stopped"
+  | "auto-stopped"
+  | "delayed";
+
+function timerToUi(s: string): WorkLogUiStatus {
+  switch (s) {
+    case "STARTED":
+      return "running";
+    case "PAUSED":
+      return "paused";
+    case "STOPPED":
+      return "stopped";
+    default:
+      return "stopped";
+  }
+}
+
+function fmtStartTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function AdminWorkTrackingPage() {
-  const [logs, setLogs] = useState<WorkLog[]>(mockLogs);
+  const [logs, setLogs] = useState<WorkLog[]>([]);
+  const [summary, setSummary] = useState({
+    records: 0,
+    started: 0,
+    paused: 0,
+    stopped: 0,
+  });
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // ⏱ AUTO + DELAY LOGIC
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
+  const load = useCallback(async () => {
+    setLoadError(null);
+    setLoading(true);
+    try {
+      const data = await fetchWorkTracking();
+      const s = data.summary ?? {};
+      setSummary({
+        records: s.records_count ?? 0,
+        started: s.started_count ?? 0,
+        paused: s.paused_count ?? 0,
+        stopped: s.stopped_count ?? 0,
+      });
 
-      setLogs((prev) =>
-        prev.map((log) => {
-          if (log.status === "running") {
-            const start = new Date(`1970-01-01 ${log.startTime}`);
-            const diffHours =
-              (now.getTime() - start.getTime()) / (1000 * 60 * 60);
-
-            // ⚠️ Delayed after 2 hrs
-            if (diffHours >= 2 && diffHours < 4) {
-              return { ...log, status: "delayed" };
-            }
-
-            // ⛔ Auto-stop after 4 hrs
-            if (diffHours >= 4) {
-              console.log(`AUTO STOP + EMAIL → ${log.employee}`);
-
-              return {
-                ...log,
-                status: "auto-stopped",
-              };
-            }
-          }
-
-          return log;
-        }),
-      );
-    }, 60000);
-
-    return () => clearInterval(interval);
+      const rows = (data.work_tracking ?? []).map((rec, idx) => ({
+        id: `wt-${idx}-${rec.task_title}`,
+        employee: rec.employee_name,
+        project: rec.project_name,
+        milestone: rec.milestone_name ?? "—",
+        task: rec.task_title,
+        status: timerToUi(rec.timer_state),
+        startDate: "",
+        endDate: "",
+        startTime: fmtStartTime(rec.current_session_start_time),
+        totalTime:
+          rec.today_worked_display ??
+          rec.total_time_spent_display ??
+          rec.current_session_display ??
+          "—",
+        taskStatus: rec.task_status,
+      }));
+      setLogs(rows);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // 📊 TABLE COLUMNS (NO ACTION COLUMN)
+  useEffect(() => {
+    void load();
+    const interval = window.setInterval(() => {
+      void load();
+    }, 30000);
+    return () => window.clearInterval(interval);
+  }, [load]);
+
   const columns: DataTableColumn[] = [
     { label: "Employee", key: "employee" },
     { label: "Project", key: "project" },
@@ -209,7 +123,6 @@ export default function AdminWorkTrackingPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* HEADER */}
       <div>
         <h1 className="ui-page-title">Work Tracking</h1>
         <p className="ui-body-muted">
@@ -217,38 +130,35 @@ export default function AdminWorkTrackingPage() {
         </p>
       </div>
 
-      {/* CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
+      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4 !flex-row !items-center !justify-between">
-          <p className="text-gray-500">Active Employees</p>
+          <p className="text-gray-500">Records</p>
+          <h2 className="text-xl font-bold text-sky-700">{summary.records}</h2>
+        </Card>
+
+        <Card className="p-4 !flex-row !items-center !justify-between">
+          <p className="text-gray-500">Running</p>
           <h2 className="text-xl font-bold text-green-600">
-            {logs.filter((l) => l.status === "running").length}
+            {summary.started}
           </h2>
         </Card>
 
         <Card className="p-4 !flex-row !items-center !justify-between">
-          <p className="text-gray-500">Paused Tasks</p>
+          <p className="text-gray-500">Paused</p>
           <h2 className="text-xl font-bold text-yellow-600">
-            {logs.filter((l) => l.status === "paused").length}
+            {summary.paused}
           </h2>
         </Card>
 
         <Card className="p-4 !flex-row !items-center !justify-between">
-          <p className="text-gray-500">Delayed Tasks</p>
-          <h2 className="text-xl font-bold text-orange-600">
-            {logs.filter((l) => l.status === "delayed").length}
-          </h2>
-        </Card>
-
-        <Card className="p-4 !flex-row !items-center !justify-between">
-          <p className="text-gray-500">Auto-Stopped</p>
-          <h2 className="text-xl font-bold text-red-600">
-            {logs.filter((l) => l.status === "auto-stopped").length}
-          </h2>
+          <p className="text-gray-500">Stopped</p>
+          <h2 className="text-xl font-bold text-gray-600">{summary.stopped}</h2>
         </Card>
       </div>
 
-      {/* TABLE */}
       <DataTable<WorkLog>
         columns={columns}
         data={logs}
@@ -262,21 +172,48 @@ export default function AdminWorkTrackingPage() {
             <span className="inline-block whitespace-nowrap">{row.task}</span>
           ),
           progress: (row) => {
-            const percent = calculateProgress(row.startDate, row.endDate);
-
+            const normalizedTaskStatus = (row.taskStatus ?? "").toUpperCase();
+            const progressLabel =
+              normalizedTaskStatus === "COMPLETED"
+                ? "Completed"
+                : normalizedTaskStatus === "DELAYED"
+                  ? "Delayed"
+                  : normalizedTaskStatus === "NOT_STARTED"
+                    ? "Not Started"
+                    : row.status === "running"
+                      ? "In Progress"
+                      : row.status === "paused"
+                        ? "Paused"
+                        : "Stopped";
+            const progressStyles = {
+              "Not Started": "bg-slate-100 text-slate-700",
+              "In Progress": "bg-blue-100 text-blue-700",
+              Paused: "bg-yellow-100 text-yellow-700",
+              Stopped: "bg-gray-100 text-gray-700",
+              Delayed: "bg-rose-100 text-rose-700",
+              Completed: "bg-emerald-100 text-emerald-700",
+            } as const;
             return (
-              <div className="min-w-[140px] max-w-[180px]">
-                <Progress
-                  percent={percent}
-                  strokeColor={getProgressColor(percent)}
-                  size="small"
-                  format={(value) => `${value ?? 0}%`}
-                />
-              </div>
+              <span
+                className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs ${progressStyles[progressLabel]}`}
+              >
+                {progressLabel}
+              </span>
             );
           },
           status: (row) => {
+            const normalizedTaskStatus = (row.taskStatus ?? "").toUpperCase();
+            const statusKey: WorkLogUiStatus =
+              normalizedTaskStatus === "NOT_STARTED"
+                ? "not-started"
+                : row.status === "running"
+                  ? "started"
+                  : normalizedTaskStatus === "DELAYED"
+                    ? "delayed"
+                    : row.status;
             const styles = {
+              "not-started": "bg-slate-100 text-slate-700",
+              started: "bg-blue-100 text-blue-700",
               running: "bg-green-100 text-green-600",
               paused: "bg-yellow-100 text-yellow-600",
               stopped: "bg-gray-100 text-gray-600",
@@ -285,6 +222,8 @@ export default function AdminWorkTrackingPage() {
             };
 
             const labels = {
+              "not-started": "Not Started",
+              started: "Started",
               running: "Running",
               paused: "Paused",
               stopped: "Stopped",
@@ -294,9 +233,9 @@ export default function AdminWorkTrackingPage() {
 
             return (
               <span
-                className={`inline-flex whitespace-nowrap px-2 py-1 text-xs rounded-full ${styles[row.status]}`}
+                className={`inline-flex whitespace-nowrap px-2 py-1 text-xs rounded-full ${styles[statusKey]}`}
               >
-                {labels[row.status]}
+                {labels[statusKey]}
               </span>
             );
           },

@@ -5,6 +5,7 @@ import Card from "@/components/common/card/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/passwordInput";
+import { parseTechFromApi } from "@/lib/admin-mappers";
 import type { UserRecord } from "./UserTable";
 
 export type UserFormValues = {
@@ -14,9 +15,11 @@ export type UserFormValues = {
   password: string;
   resetPassword: boolean;
 
+  role: UserRecord["role"];
   designation: string;
   developerType: string;
   techStack: string[];
+  techOther: string;
 };
 
 type Props = {
@@ -54,9 +57,11 @@ const initialState: UserFormValues = {
   email: "",
   password: "",
   resetPassword: false,
+  role: "Employee",
   designation: "",
   developerType: "",
   techStack: [],
+  techOther: "",
 };
 
 export default function UserForm({
@@ -66,24 +71,61 @@ export default function UserForm({
   onSubmit,
 }: Props) {
   const [values, setValues] = useState(initialState);
+  const [techError, setTechError] = useState("");
 
   useEffect(() => {
-    if (!initialValues) return;
+    if (!initialValues) {
+      setValues({ ...initialState });
+      setTechError("");
+      return;
+    }
+
+    const parsed = parseTechFromApi(
+      initialValues.apiTechStack,
+      initialValues.techNotes,
+    );
 
     setValues((prev) => ({
       ...prev,
       firstName: initialValues.firstName || "",
       lastName: initialValues.lastName || "",
       email: initialValues.email || "",
+      password: "",
+      role: initialValues.role ?? prev.role ?? "Employee",
       designation: initialValues.designation || "",
       developerType: initialValues.developerType || "",
-      techStack: initialValues.techStack || [],
+      techStack: parsed.techStack.length
+        ? parsed.techStack
+        : initialValues.techStack || [],
+      techOther: parsed.techOther,
     }));
   }, [initialValues]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (values.role === "Employee") {
+      const hasTech =
+        values.techStack.length > 0 || values.techOther.trim().length > 0;
+      if (!hasTech) {
+        setTechError("Select at least one tech or add details under Other.");
+        return;
+      }
+    }
+    setTechError("");
     onSubmit(values);
+  };
+
+  const showEmployeeFields = values.role === "Employee";
+
+  const toggleTech = (label: string) => {
+    setTechError("");
+    setValues((prev) => {
+      const has = prev.techStack.includes(label);
+      const techStack = has
+        ? prev.techStack.filter((t) => t !== label)
+        : [...prev.techStack, label];
+      return { ...prev, techStack };
+    });
   };
 
   return (
@@ -138,119 +180,183 @@ export default function UserForm({
             />
           </div>
 
-          {/* DESIGNATION */}
-          <div className="space-y-1.5">
+          {/* ROLE */}
+          <div className="space-y-1.5 md:col-span-2">
             <label
-              htmlFor="user-designation"
+              htmlFor="user-role"
               className="text-sm font-medium text-cs-heading"
             >
-              Designation
+              Role
             </label>
             <select
-              id="user-designation"
-              value={values.designation}
-              onChange={(e) =>
-                setValues({ ...values, designation: e.target.value })
-              }
-              className="h-11 w-full rounded-lg border px-3 text-sm"
-            >
-              <option value="">Select Designation</option>
-              {DESIGNATIONS.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* DEV TYPE */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="user-developer-type"
-              className="text-sm font-medium text-cs-heading"
-            >
-              Developer Type
-            </label>
-            <select
-              id="user-developer-type"
-              value={values.developerType}
-              onChange={(e) =>
-                setValues({ ...values, developerType: e.target.value })
-              }
-              className="h-11 w-full rounded-lg border px-3 text-sm"
-            >
-              <option value="">Select Developer Type</option>
-              {DEV_TYPES.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* TECH STACK MULTI SELECT */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="user-tech-stack"
-              className="text-sm font-medium text-cs-heading"
-            >
-              Tech Stack
-            </label>
-
-            <select
-              id="user-tech-stack"
-              multiple
-              value={values.techStack}
+              id="user-role"
+              value={values.role}
               onChange={(e) => {
-                const selectedOptions = Array.from(
-                  e.target.selectedOptions,
-                ).map((option) => option.value);
-
-                setValues({ ...values, techStack: selectedOptions });
+                const role = e.target.value as UserRecord["role"];
+                setTechError("");
+                setValues((prev) => ({
+                  ...prev,
+                  role,
+                  ...(role === "Employee"
+                    ? {}
+                    : {
+                        designation: "",
+                        developerType: "",
+                        techStack: [],
+                        techOther: "",
+                      }),
+                }));
               }}
-              className="min-h-[120px] w-full rounded-lg border px-3 py-2 text-sm"
+              className="h-11 w-full rounded-lg border px-3 text-sm"
             >
-              {TECH_STACK.map((tech) => (
-                <option key={tech} value={tech}>
-                  {tech}
-                </option>
-              ))}
+              <option value="Admin">Admin</option>
+              <option value="BA">BA</option>
+              <option value="Employee">Employee</option>
             </select>
-
-            {/* Selected Tags */}
-            {values.techStack.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {values.techStack.map((tech) => (
-                  <span
-                    key={tech}
-                    className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-full"
-                  >
-                    {tech}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
+
+          {showEmployeeFields ? (
+            <>
+              {/* DESIGNATION */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="user-designation"
+                  className="text-sm font-medium text-cs-heading"
+                >
+                  Designation
+                </label>
+                <select
+                  id="user-designation"
+                  value={values.designation}
+                  onChange={(e) =>
+                    setValues({ ...values, designation: e.target.value })
+                  }
+                  className="h-11 w-full rounded-lg border px-3 text-sm"
+                >
+                  <option value="">Select Designation</option>
+                  {DESIGNATIONS.map((d) => (
+                    <option key={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* DEV TYPE */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="user-developer-type"
+                  className="text-sm font-medium text-cs-heading"
+                >
+                  Developer Type
+                </label>
+                <select
+                  id="user-developer-type"
+                  value={values.developerType}
+                  onChange={(e) =>
+                    setValues({ ...values, developerType: e.target.value })
+                  }
+                  className="h-11 w-full rounded-lg border px-3 text-sm"
+                >
+                  <option value="">Select Developer Type</option>
+                  {DEV_TYPES.map((d) => (
+                    <option key={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* TECH STACK — checkboxes + Other */}
+              <div className="space-y-1.5">
+                <span className="text-sm font-medium text-cs-heading">
+                  Tech Stack
+                </span>
+                <p className="text-xs text-gray-500">
+                  Select one or more. Use Other for anything not listed.
+                </p>
+                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+                  {TECH_STACK.map((tech) => (
+                    <label
+                      key={tech}
+                      className="flex cursor-pointer items-center gap-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300"
+                        checked={values.techStack.includes(tech)}
+                        onChange={() => toggleTech(tech)}
+                      />
+                      {tech}
+                    </label>
+                  ))}
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  <label
+                    htmlFor="user-tech-other"
+                    className="text-sm text-gray-700"
+                  >
+                    Other (custom)
+                  </label>
+                  <Input
+                    id="user-tech-other"
+                    className="h-10 w-full rounded-lg border px-3 text-sm"
+                    placeholder="e.g. Kubernetes, Rust…"
+                    value={values.techOther}
+                    onChange={(e) => {
+                      setTechError("");
+                      setValues({ ...values, techOther: e.target.value });
+                    }}
+                  />
+                  {techError ? (
+                    <p className="text-xs text-red-600">{techError}</p>
+                  ) : null}
+                </div>
+                {(values.techStack.length > 0 ||
+                  values.techOther.trim().length > 0) && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {values.techStack.map((tech) => (
+                      <span
+                        key={tech}
+                        className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-600"
+                      >
+                        {tech}
+                      </span>
+                    ))}
+                    {values.techOther.trim() ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                        Other: {values.techOther.trim()}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : null}
 
           {/* PASSWORD */}
-          {mode === "create" && (
-            <div className="space-y-1.5">
-              <label
-                htmlFor="user-password"
-                className="text-sm font-medium text-cs-heading"
-              >
-                Password
-              </label>
-              <PasswordInput
-                id="user-password"
-                className="h-11 w-full rounded-lg border px-3 text-sm"
-                placeholder="Enter password (min. 6 characters)"
-                value={values.password}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setValues({ ...values, password: e.target.value })
-                }
-              />
-              <p className="text-xs text-gray-500">
-                Password must be at least 6 characters.
-              </p>
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="user-password"
+              className="text-sm font-medium text-cs-heading"
+            >
+              {mode === "create" ? "Password" : "New Password (optional)"}
+            </label>
+            <PasswordInput
+              id="user-password"
+              className="h-11 w-full rounded-lg border px-3 text-sm"
+              placeholder={
+                mode === "create"
+                  ? "Enter password (min. 6 characters)"
+                  : "Enter new password to reset and email user"
+              }
+              value={values.password}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setValues({ ...values, password: e.target.value })
+              }
+            />
+            <p className="text-xs text-gray-500">
+              {mode === "create"
+                ? "Password must be at least 6 characters."
+                : "Leave empty if you do not want to change the password."}
+            </p>
+          </div>
         </div>
 
         {/* ACTIONS */}

@@ -1,62 +1,137 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import TaskForm, {
   type TaskFormValues,
 } from "@/components/common/tasks/TaskForm";
 import TaskTable, { type Task } from "@/components/common/tasks/TaskTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import {
+  type ApiMilestone,
+  type ApiProject,
+  type ApiTask,
+  type ApiUser,
+  apiTaskToRow,
+  buildTaskFormData,
+} from "@/lib/admin-mappers";
+import {
+  drfDelete,
+  drfFormDataPatch,
+  drfFormDataPost,
+  fetchAllPages,
+} from "@/lib/pms-http";
 
 export default function TaskPage() {
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
-  const employees = [
-    { id: "emp-1", name: "Anita Sharma" },
-    { id: "emp-2", name: "Ravi Verma" },
-    { id: "emp-3", name: "Nisha Gupta" },
-    { id: "emp-4", name: "Karan Singh" },
-  ];
-  const projects = [
-    { id: "prj-101", name: "Project Atlas" },
-    { id: "prj-102", name: "Project Beacon" },
-    { id: "prj-103", name: "Project Horizon" },
-  ];
-  const milestones = [
-    { id: "ms-1", name: "Requirements Sign-off", projectId: "prj-101" },
-    { id: "ms-2", name: "UI Prototype Completion", projectId: "prj-102" },
-    { id: "ms-3", name: "API Integration", projectId: "prj-103" },
-  ];
-  const projectNameMap = Object.fromEntries(
-    projects.map((project) => [project.id, project.name]),
-  );
-  const milestoneNameMap = Object.fromEntries(
-    milestones.map((milestone) => [milestone.id, milestone.name]),
-  );
-  const assignedByNameMap = Object.fromEntries(
-    employees.map((employee) => [employee.id, employee.name]),
-  );
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleSubmit = (data: TaskFormValues) => {
-    if (editing) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === editing.id ? { ...t, ...data, employee: t.employee } : t,
-        ),
+  const [projectOptions, setProjectOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [milestoneOptions, setMilestoneOptions] = useState<
+    { id: string; name: string; projectId: string }[]
+  >([]);
+  const [employeeOptions, setEmployeeOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [userNameMap, setUserNameMap] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    setLoadError(null);
+    setLoading(true);
+    try {
+      const [userRows, projectRows, milestoneRows, taskRows] =
+        await Promise.all([
+          fetchAllPages<ApiUser>("/api/v1/users/"),
+          fetchAllPages<ApiProject>("/api/v1/projects/"),
+          fetchAllPages<ApiMilestone>("/api/v1/milestones/"),
+          fetchAllPages<ApiTask>("/api/v1/tasks/"),
+        ]);
+
+      const names: Record<string, string> = {};
+      for (const u of userRows) {
+        const label =
+          `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email;
+        names[String(u.id)] = label;
+      }
+      setUserNameMap(names);
+
+      setEmployeeOptions(
+        userRows
+          .filter((u) => u.role === "EMPLOYEE")
+          .map((u) => ({
+            id: String(u.id),
+            name:
+              `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email,
+          })),
       );
-      showToast("Task updated successfully", "success");
-    } else {
-      setTasks((prev) => [
-        { ...data, id: Date.now().toString(), employee: "" },
-        ...prev,
-      ]);
-      showToast("Task created successfully", "success");
-    }
 
-    closeModal();
+      setProjectOptions(
+        projectRows.map((p) => ({ id: String(p.id), name: p.name })),
+      );
+
+      setMilestoneOptions(
+        milestoneRows.map((m) => ({
+          id: String(m.id),
+          name: m.name,
+          projectId: String(m.project),
+        })),
+      );
+
+      setTasks(taskRows.map(apiTaskToRow));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load tasks");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const projectNameMap = useMemo(
+    () => Object.fromEntries(projectOptions.map((p) => [p.id, p.name])),
+    [projectOptions],
+  );
+  const projectHrefMap = useMemo(
+    () =>
+      Object.fromEntries(
+        projectOptions.map((p) => [p.id, `/admin/projects/${p.id}`]),
+      ),
+    [projectOptions],
+  );
+
+  const milestoneNameMap = useMemo(
+    () => Object.fromEntries(milestoneOptions.map((m) => [m.id, m.name])),
+    [milestoneOptions],
+  );
+
+  /** Maps created_by ids to labels */
+  const assignedByNameMap = userNameMap;
+
+  const handleSubmit = async (data: TaskFormValues) => {
+    try {
+      const fd = buildTaskFormData(data);
+      if (editing) {
+        await drfFormDataPatch<ApiTask>(`/api/v1/tasks/${editing.id}/`, fd);
+        showToast("Task updated successfully", "success");
+      } else {
+        await drfFormDataPost<ApiTask>("/api/v1/tasks/", fd);
+        showToast("Task created successfully", "success");
+      }
+
+      closeModal();
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Save failed", "error");
+    }
   };
 
   const closeModal = () => {
@@ -69,9 +144,15 @@ export default function TaskPage() {
     setOpen(true);
   };
 
-  const handleDelete = (task: Task) => {
-    setTasks((prev) => prev.filter((item) => item.id !== task.id));
-    showToast("Task deleted successfully", "success");
+  const handleDelete = async (task: Task) => {
+    if (!confirm(`Delete task “${task.name}”?`)) return;
+    try {
+      await drfDelete(`/api/v1/tasks/${task.id}/`);
+      showToast("Task deleted successfully", "success");
+      await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Delete failed", "error");
+    }
   };
 
   useEffect(() => {
@@ -87,21 +168,30 @@ export default function TaskPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between">
         <h1 className="ui-page-title">Tasks</h1>
-        <Button onClick={() => setOpen(true)}>
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setOpen(true);
+          }}
+        >
           <Plus size={16} /> Add Task
         </Button>
       </div>
 
+      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
+      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
+
       <TaskTable
         tasks={tasks}
         projectNameMap={projectNameMap}
+        projectHrefMap={projectHrefMap}
         milestoneNameMap={milestoneNameMap}
         assignedByNameMap={assignedByNameMap}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
 
-      {open && (
+      {open ? (
         <div className="fixed inset-0 z-50 overflow-y-auto p-4 flex justify-center">
           <button
             type="button"
@@ -119,9 +209,9 @@ export default function TaskPage() {
             <div className="pointer-events-auto">
               <TaskForm
                 initial={editing}
-                employees={employees}
-                projects={projects}
-                milestones={milestones}
+                employees={employeeOptions}
+                projects={projectOptions}
+                milestones={milestoneOptions}
                 showAssignedBy
                 onSubmit={handleSubmit}
                 onCancel={closeModal}
@@ -129,7 +219,7 @@ export default function TaskPage() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
