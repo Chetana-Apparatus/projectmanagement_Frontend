@@ -27,18 +27,24 @@ const singleLineCellStyle: CSSProperties = {
 
 export default function EmployeeTasksPage() {
   const {
+    loading,
     myTasks,
     startTask,
     pauseTask,
     stopTask,
     completeTask,
+    requestDeadlineChange,
     canTransition,
   } = useEmployeeTasks();
   const [isDocsModalOpen, setIsDocsModalOpen] = useState(false);
+  const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [selectedProjectName, setSelectedProjectName] = useState("");
   const [selectedDocument, setSelectedDocument] = useState<
     EmployeeManagedTask["documents"][number] | null
   >(null);
+  const [deadlineTaskId, setDeadlineTaskId] = useState<string | null>(null);
+  const [requestedDeadline, setRequestedDeadline] = useState("");
+  const [deadlineReason, setDeadlineReason] = useState("");
 
   const openProjectDocuments = (task: EmployeeManagedTask) => {
     setSelectedProjectName(task.project);
@@ -58,13 +64,25 @@ export default function EmployeeTasksPage() {
   };
 
   const handleStop = (taskId: string) => {
+    stopTask(taskId);
+  };
+
+  const handleComplete = (
+    taskId: string,
+    taskStatus: EmployeeManagedTask["status"],
+  ) => {
+    const alreadyCompleted = taskStatus === "Completed";
     Modal.confirm({
-      title: "Stop this task?",
-      content: "This task will be moved to Work History.",
-      okText: "Yes, Stop",
+      title: alreadyCompleted
+        ? "Send completion mail again?"
+        : "Mark task as completed?",
+      content: alreadyCompleted
+        ? "This will resend completion notification mail."
+        : "If timer is running, stop task first and then complete.",
+      okText: alreadyCompleted ? "Send Mail" : "Complete",
       cancelText: "Cancel",
       onOk: () => {
-        stopTask(taskId);
+        completeTask(taskId);
       },
     });
   };
@@ -156,9 +174,11 @@ export default function EmployeeTasksPage() {
       render: (_, record) => {
         const canStart = canTransition(record.status, "In Progress");
         const canPause = canTransition(record.status, "Paused");
-        const canStop = canTransition(record.status, "Completed");
-        const canComplete = canTransition(record.status, "Completed");
-        const disableAllActions = record.status === "Completed";
+        const canStop = canTransition(record.status, "Stopped");
+        const canComplete =
+          canTransition(record.status, "Completed") ||
+          record.status === "Completed";
+        const disableAllActions = record.status === "Blocked";
 
         return (
           <div className="flex flex-nowrap justify-end gap-2">
@@ -192,9 +212,22 @@ export default function EmployeeTasksPage() {
               variant="secondary"
               className="h-8 px-3 text-xs"
               disabled={disableAllActions || !canComplete}
-              onClick={() => completeTask(record.id)}
+              onClick={() => handleComplete(record.id, record.status)}
             >
               Complete
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-8 px-3 text-xs"
+              disabled={disableAllActions || record.status === "Completed"}
+              onClick={() => {
+                setDeadlineTaskId(record.id);
+                setRequestedDeadline("");
+                setDeadlineReason("");
+                setIsDeadlineModalOpen(true);
+              }}
+            >
+              Request Deadline
             </Button>
           </div>
         );
@@ -211,6 +244,9 @@ export default function EmployeeTasksPage() {
 
       <Card className="items-start justify-start rounded-2xl shadow-sm">
         <div className="w-full space-y-4">
+          {loading ? (
+            <p className="text-sm text-gray-500">Loading tasks…</p>
+          ) : null}
           <Table<EmployeeManagedTask>
             rowKey="id"
             columns={columns}
@@ -264,6 +300,44 @@ export default function EmployeeTasksPage() {
               No documents available for this project yet.
             </p>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        title="Request Task Deadline Change"
+        open={isDeadlineModalOpen}
+        onCancel={() => setIsDeadlineModalOpen(false)}
+        onOk={() => {
+          if (!deadlineTaskId || !requestedDeadline) return;
+          void requestDeadlineChange(
+            deadlineTaskId,
+            requestedDeadline,
+            deadlineReason || "Need more time to complete task.",
+          );
+          setIsDeadlineModalOpen(false);
+        }}
+        okText="Send Request"
+      >
+        <div className="space-y-3">
+          <label className="block text-sm text-cs-heading">
+            New Deadline
+            <input
+              type="date"
+              value={requestedDeadline}
+              onChange={(e) => setRequestedDeadline(e.target.value)}
+              className="mt-1 w-full rounded-md border border-cs-border px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block text-sm text-cs-heading">
+            Reason
+            <textarea
+              value={deadlineReason}
+              onChange={(e) => setDeadlineReason(e.target.value)}
+              rows={4}
+              className="mt-1 w-full rounded-md border border-cs-border px-3 py-2 text-sm"
+              placeholder="Add reason for deadline extension"
+            />
+          </label>
         </div>
       </Modal>
     </div>

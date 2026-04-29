@@ -23,24 +23,21 @@ type WorkLog = {
 
 type WorkLogUiStatus =
   | "not-started"
-  | "started"
   | "running"
   | "paused"
   | "stopped"
-  | "auto-stopped"
-  | "delayed";
+  | "completed";
 
-function timerToUi(s: string): WorkLogUiStatus {
-  switch (s) {
-    case "STARTED":
-      return "running";
-    case "PAUSED":
-      return "paused";
-    case "STOPPED":
-      return "stopped";
-    default:
-      return "stopped";
-  }
+function resolveWorkStatus(
+  timerState: string | undefined,
+  taskStatus: string | undefined,
+): WorkLogUiStatus {
+  const normalizedTaskStatus = (taskStatus ?? "").toUpperCase();
+  if (normalizedTaskStatus === "COMPLETED") return "completed";
+  if (normalizedTaskStatus === "NOT_STARTED") return "not-started";
+  if (timerState === "STARTED") return "running";
+  if (timerState === "PAUSED") return "paused";
+  return "stopped";
 }
 
 function fmtStartTime(iso: string | null | undefined): string {
@@ -83,7 +80,7 @@ export default function BAWorkTrackingPage() {
         project: rec.project_name,
         milestone: rec.milestone_name ?? "—",
         task: rec.task_title,
-        status: timerToUi(rec.timer_state),
+        status: resolveWorkStatus(rec.timer_state, rec.task_status),
         startDate: "",
         endDate: "",
         startTime: fmtStartTime(rec.current_session_start_time),
@@ -115,7 +112,6 @@ export default function BAWorkTrackingPage() {
     { label: "Project", key: "project" },
     { label: "Milestone", key: "milestone" },
     { label: "Task", key: "task" },
-    { label: "Progress", key: "progress" },
     { label: "Status", key: "status" },
     { label: "Start Time", key: "startTime" },
     { label: "Total Time", key: "totalTime" },
@@ -171,64 +167,22 @@ export default function BAWorkTrackingPage() {
           task: (row) => (
             <span className="inline-block whitespace-nowrap">{row.task}</span>
           ),
-          progress: (row) => {
-            const normalizedTaskStatus = (row.taskStatus ?? "").toUpperCase();
-            const progressLabel =
-              normalizedTaskStatus === "COMPLETED"
-                ? "Completed"
-                : normalizedTaskStatus === "DELAYED"
-                  ? "Delayed"
-                  : normalizedTaskStatus === "NOT_STARTED"
-                    ? "Not Started"
-                    : row.status === "running"
-                      ? "In Progress"
-                      : row.status === "paused"
-                        ? "Paused"
-                        : "Stopped";
-            const progressStyles = {
-              "Not Started": "bg-slate-100 text-slate-700",
-              "In Progress": "bg-blue-100 text-blue-700",
-              Paused: "bg-yellow-100 text-yellow-700",
-              Stopped: "bg-gray-100 text-gray-700",
-              Delayed: "bg-rose-100 text-rose-700",
-              Completed: "bg-emerald-100 text-emerald-700",
-            } as const;
-            return (
-              <span
-                className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs ${progressStyles[progressLabel]}`}
-              >
-                {progressLabel}
-              </span>
-            );
-          },
           status: (row) => {
-            const normalizedTaskStatus = (row.taskStatus ?? "").toUpperCase();
-            const statusKey: WorkLogUiStatus =
-              normalizedTaskStatus === "NOT_STARTED"
-                ? "not-started"
-                : row.status === "running"
-                  ? "started"
-                  : normalizedTaskStatus === "DELAYED"
-                    ? "delayed"
-                    : row.status;
+            const statusKey: WorkLogUiStatus = row.status;
             const styles = {
               "not-started": "bg-slate-100 text-slate-700",
-              started: "bg-blue-100 text-blue-700",
               running: "bg-green-100 text-green-600",
               paused: "bg-yellow-100 text-yellow-600",
               stopped: "bg-gray-100 text-gray-600",
-              delayed: "bg-orange-100 text-orange-600",
-              "auto-stopped": "bg-red-100 text-red-600",
+              completed: "bg-emerald-100 text-emerald-700",
             };
 
             const labels = {
               "not-started": "Not Started",
-              started: "Started",
               running: "Running",
               paused: "Paused",
               stopped: "Stopped",
-              delayed: "Delayed",
-              "auto-stopped": "Auto-Stopped",
+              completed: "Completed",
             };
 
             return (

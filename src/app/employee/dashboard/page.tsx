@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal, Progress, Table } from "antd";
+import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { Activity, PauseCircle, PlayCircle, Square } from "lucide-react";
 import { useMemo } from "react";
@@ -9,51 +9,17 @@ import StatusBadge from "@/components/common/status/StatusBadge";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import type { ManagedTaskStatus } from "@/features/employee-tasks/status";
-import { calculateProgress, getProgressColor } from "@/utils/progress";
-
-type ActivityItem = {
-  id: string;
-  action: "Task started" | "Task paused" | "Task auto-stopped";
-  description: string;
-  time: string;
-};
-
-const recentActivity: ActivityItem[] = [
-  {
-    id: "a1",
-    action: "Task started",
-    description: "Implement discount validation edge cases",
-    time: "10:12 AM",
-  },
-  {
-    id: "a2",
-    action: "Task paused",
-    description: "Fix role-based route access bug",
-    time: "09:46 AM",
-  },
-  {
-    id: "a3",
-    action: "Task auto-stopped",
-    description: "Refactor invoice export utility",
-    time: "Yesterday, 06:02 PM",
-  },
-  {
-    id: "a4",
-    action: "Task started",
-    description: "Improve timeline loading states",
-    time: "Yesterday, 03:18 PM",
-  },
-];
 
 function getStatusVariant(status: ManagedTaskStatus) {
   switch (status) {
     case "In Progress":
       return "onTrack";
-    case "Auto-stopped":
-      return "delayed";
-    case "Pending":
     case "Paused":
       return "active";
+    case "Delayed":
+      return "delayed";
+    case "Stopped":
+    case "Blocked":
     case "Not Started":
     case "Completed":
       return "deactivated";
@@ -89,23 +55,6 @@ const columns: ColumnsType<DashboardTaskRow> = [
     key: "milestone",
   },
   {
-    title: "Progress",
-    key: "progress",
-    render: (_, record) => {
-      const percent = calculateProgress(record.startDate, record.endDate);
-      return (
-        <div className="min-w-[140px] max-w-[180px]">
-          <Progress
-            percent={percent}
-            strokeColor={getProgressColor(percent)}
-            size="small"
-            format={(value) => `${value ?? 0}%`}
-          />
-        </div>
-      );
-    },
-  },
-  {
     title: "Status",
     key: "status",
     render: (_, record) => (
@@ -118,9 +67,12 @@ const columns: ColumnsType<DashboardTaskRow> = [
 
 export default function EmployeeDashboardPage() {
   const {
+    loading,
     tasks,
     myTasks,
     activeTask,
+    completedTasksCount,
+    recentActivity,
     startTask,
     pauseTask,
     stopTask,
@@ -129,15 +81,22 @@ export default function EmployeeDashboardPage() {
 
   const dashboardTasks = useMemo<DashboardTaskRow[]>(
     () =>
-      myTasks.map((task) => ({
-        key: task.id,
-        taskName: task.task,
-        project: task.project,
-        milestone: task.milestone,
-        startDate: task.startDate,
-        endDate: task.deadline,
-        status: task.status,
-      })),
+      myTasks
+        .filter(
+          (task) =>
+            task.status === "In Progress" ||
+            task.status === "Paused" ||
+            task.status === "Stopped",
+        )
+        .map((task) => ({
+          key: task.id,
+          taskName: task.task,
+          project: task.project,
+          milestone: task.milestone,
+          startDate: task.startDate,
+          endDate: task.deadline,
+          status: task.status,
+        })),
     [myTasks],
   );
 
@@ -153,15 +112,7 @@ export default function EmployeeDashboardPage() {
 
   const handleStop = () => {
     if (!activeTask) return;
-    Modal.confirm({
-      title: "Stop this task?",
-      content: "This task will be moved to Work History.",
-      okText: "Yes, Stop",
-      cancelText: "Cancel",
-      onOk: () => {
-        stopTask(activeTask.id);
-      },
-    });
+    stopTask(activeTask.id);
   };
 
   const summaryStats = useMemo(
@@ -183,7 +134,7 @@ export default function EmployeeDashboardPage() {
       },
       {
         label: "Completed",
-        value: tasks.filter((task) => task.status === "Completed").length,
+        value: completedTasksCount,
         valueClass: "text-emerald-600",
       },
       {
@@ -192,7 +143,7 @@ export default function EmployeeDashboardPage() {
         valueClass: "text-cs-primary-100",
       },
     ],
-    [tasks],
+    [tasks, completedTasksCount],
   );
 
   const canStart = activeTask
@@ -202,7 +153,7 @@ export default function EmployeeDashboardPage() {
     ? canTransition(activeTask.status, "Paused")
     : false;
   const canStop = activeTask
-    ? canTransition(activeTask.status, "Completed")
+    ? canTransition(activeTask.status, "Stopped")
     : false;
   const disableAllActions = !activeTask || activeTask.status === "Completed";
 
@@ -238,6 +189,9 @@ export default function EmployeeDashboardPage() {
               {activeTask?.task ?? "No active task"}
             </p>
           </div>
+          {loading ? (
+            <p className="p1 text-cs-text">Loading employee dashboard…</p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-3">
             <Button
               className="h-8 px-3 text-xs"
@@ -310,7 +264,7 @@ export default function EmployeeDashboardPage() {
                   <Activity className="mt-0.5 size-4 text-cs-primary-100" />
                   <div>
                     <p className="p1 font-medium text-cs-heading">
-                      {item.action}
+                      {item.action.replaceAll("_", " ")}
                     </p>
                     <p className="p1 text-cs-text">{item.description}</p>
                   </div>

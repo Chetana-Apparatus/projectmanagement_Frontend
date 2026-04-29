@@ -44,7 +44,7 @@ type WorkTrackingRow = {
   id: string;
   employee: string;
   currentFocus: string;
-  status: "Running" | "Paused" | "Stopped" | "Delayed";
+  status: "Running" | "Paused" | "Stopped";
 };
 
 function pickPrimaryMilestone(
@@ -128,16 +128,15 @@ function mapWorkTracking(
   return rows
     .map((row, idx): WorkTrackingRow | null => {
       const taskStatus = (row.task_status ?? "").toUpperCase();
-      if (taskStatus === "COMPLETED" || taskStatus === "NOT_STARTED")
+      if (taskStatus === "COMPLETED" || taskStatus === "NOT_STARTED") {
         return null;
+      }
       const status: WorkTrackingRow["status"] =
-        taskStatus === "DELAYED"
-          ? "Delayed"
-          : row.timer_state === "STARTED"
-            ? "Running"
-            : row.timer_state === "PAUSED"
-              ? "Paused"
-              : "Stopped";
+        row.timer_state === "STARTED"
+          ? "Running"
+          : row.timer_state === "PAUSED"
+            ? "Paused"
+            : "Stopped";
       return {
         id: `wk-${idx}-${row.task_title}`,
         employee: row.employee_name,
@@ -327,7 +326,6 @@ export default function AdminDashboardPage() {
                   Running: "bg-green-100 text-green-600",
                   Paused: "bg-yellow-100 text-yellow-600",
                   Stopped: "bg-gray-100 text-gray-600",
-                  Delayed: "bg-rose-100 text-rose-700",
                 };
 
                 return (

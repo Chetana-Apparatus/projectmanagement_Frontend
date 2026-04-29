@@ -10,24 +10,65 @@ import {
 } from "react";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import {
-  applyAutoStop,
   type EmployeeManagedTask,
+  fileNameFromPath,
   isTransitionAllowed,
-  loadEmployeeTasks,
   type ManagedTaskStatus,
-  saveEmployeeTasks,
-  transitionTaskStatus,
+  mapApiTaskStatusToManaged,
+  toDocumentType,
 } from "@/features/employee-tasks/status";
+import {
+  fetchWorkTracking,
+  type WorkTrackingPayload,
+} from "@/lib/admin-dashboard-api";
+import { apiFetch } from "@/lib/api-client";
+
+type EmployeeDashboardPayload = {
+  active_task: { id: number; title: string } | null;
+  completed_tasks: number;
+};
+
+type EmployeeTaskApi = {
+  id: number;
+  project_name?: string;
+  project_document?: string | null;
+  milestone_name?: string | null;
+  milestone_document?: string | null;
+  title: string;
+  assigned_to_name?: string | null;
+  created_by_name?: string | null;
+  status: string;
+  created_at?: string;
+  deadline?: string | null;
+  document?: string | null;
+};
+
+type ActivityItem = {
+  id: string;
+  taskId: string;
+  action: "STARTED" | "PAUSED" | "STOPPED" | "COMPLETED";
+  description: string;
+  time: string;
+};
 
 type EmployeeTasksContextValue = {
+  loading: boolean;
   tasks: EmployeeManagedTask[];
   myTasks: EmployeeManagedTask[];
   historyTasks: EmployeeManagedTask[];
   activeTask: EmployeeManagedTask | null;
-  startTask: (taskId: string) => void;
-  pauseTask: (taskId: string) => void;
-  stopTask: (taskId: string) => void;
-  completeTask: (taskId: string) => void;
+  completedTasksCount: number;
+  recentActivity: ActivityItem[];
+  startTask: (taskId: string) => Promise<void>;
+  pauseTask: (taskId: string) => Promise<void>;
+  stopTask: (taskId: string) => Promise<void>;
+  completeTask: (taskId: string) => Promise<void>;
+  requestDeadlineChange: (
+    taskId: string,
+    newDeadline: string,
+    reason: string,
+  ) => Promise<void>;
+  refresh: () => Promise<void>;
   canTransition: (
     status: ManagedTaskStatus,
     nextStatus: ManagedTaskStatus,
@@ -44,54 +85,197 @@ export function EmployeeTasksProvider({
   children: React.ReactNode;
 }) {
   const { showToast } = useToast();
-  const [tasks, setTasks] = useState<EmployeeManagedTask[]>(() =>
-    loadEmployeeTasks(),
+  const [tasks, setTasks] = useState<EmployeeManagedTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [completedTasksCount, setCompletedTasksCount] = useState(0);
+  const [activeTaskFromApi, setActiveTaskFromApi] = useState<number | null>(
+    null,
+  );
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+
+  const buildManagedTask = useCallback(
+    (task: EmployeeTaskApi): EmployeeManagedTask => {
+      const documents = [
+        task.project_document,
+        task.milestone_document,
+        task.document,
+      ]
+        .filter((doc): doc is string => Boolean(doc))
+        .map((doc) => ({
+          name: fileNameFromPath(doc),
+          url: doc,
+          type: toDocumentType(doc),
+        }));
+      return {
+        id: String(task.id),
+        project: task.project_name ?? "-",
+        milestone: task.milestone_name ?? "-",
+        task: task.title,
+        status: mapApiTaskStatusToManaged(task.status),
+        startDate: task.created_at
+          ? new Date(task.created_at).toISOString().slice(0, 10)
+          : "-",
+        deadline: task.deadline ?? "-",
+        assignedBy: task.created_by_name ?? task.assigned_to_name ?? "-",
+        documents,
+        lastInteractionAt: Date.now(),
+      };
+    },
+    [],
   );
 
-  useEffect(() => {
-    saveEmployeeTasks(tasks);
-  }, [tasks]);
+  const refresh = useCallback(async () => {
+    try {
+      const [dashboardRes, tasksRes] = await Promise.all([
+        apiFetch<EmployeeDashboardPayload>("/api/v1/employee/dashboard", {
+          method: "GET",
+        }),
+        apiFetch<EmployeeTaskApi[]>("/api/v1/my/tasks", { method: "GET" }),
+      ]);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      const now = new Date();
-      if (now.getHours() < 20) {
-        return;
+      if (dashboardRes.success && dashboardRes.data) {
+        setCompletedTasksCount(dashboardRes.data.completed_tasks ?? 0);
+        setActiveTaskFromApi(dashboardRes.data.active_task?.id ?? null);
       }
 
-      setTasks((prevTasks) => {
-        const { nextTasks, autoStoppedIds } = applyAutoStop(prevTasks);
-        if (autoStoppedIds.length > 0) {
-          showToast(
-            "Task was automatically stopped due to inactivity",
-            "warning",
-          );
-        }
-        return nextTasks;
-      });
-    }, 60 * 1000);
+      if (tasksRes.success && tasksRes.data) {
+        setTasks(tasksRes.data.map(buildManagedTask));
+      } else {
+        setTasks([]);
+      }
 
+      let workTracking: WorkTrackingPayload = { recent_activity: [] };
+      try {
+        workTracking = await fetchWorkTracking();
+      } catch {
+        // Optional feed only; dashboard and /my/tasks must still load if this fails.
+      }
+
+      const activityRows = (workTracking.recent_activity ??
+        []) as WorkTrackingPayload["recent_activity"];
+      setRecentActivity(
+        (activityRows ?? [])
+          .slice()
+          .sort(
+            (a, b) =>
+              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+          )
+          .map((item, idx) => ({
+            id: `${item.task_id}-${item.timestamp}-${idx}`,
+            taskId: String(item.task_id),
+            action: item.action,
+            description: `${item.employee_name} ${item.action.toLowerCase()} task "${item.task_title}" in ${item.project_name}`,
+            time: new Date(item.timestamp).toLocaleString(),
+          })),
+      );
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "Failed to load employee data",
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [buildManagedTask, showToast]);
+
+  useEffect(() => {
+    void refresh();
+    const intervalId = window.setInterval(() => {
+      void refresh();
+    }, 30000);
     return () => window.clearInterval(intervalId);
-  }, [showToast]);
+  }, [refresh]);
 
-  const runTransition = useCallback(
-    (taskId: string, nextStatus: ManagedTaskStatus, toastMessage: string) => {
-      setTasks((prevTasks) => {
-        const { nextTasks, didTransition } = transitionTaskStatus(
-          prevTasks,
-          taskId,
-          nextStatus,
-        );
-        if (didTransition) {
-          showToast(
-            toastMessage,
-            nextStatus === "Completed" ? "success" : "warning",
-          );
-        }
-        return nextTasks;
-      });
+  const startTask = useCallback(
+    async (taskId: string) => {
+      const res = await apiFetch<{ task_id: number }>(
+        `/api/v1/tasks/${taskId}/start/`,
+        {
+          method: "POST",
+        },
+      );
+      if (!res.success) {
+        showToast(res.message || "Failed to start task", "error");
+        return;
+      }
+      showToast("Task started", "success");
+      await refresh();
     },
-    [showToast],
+    [refresh, showToast],
+  );
+
+  const pauseTask = useCallback(
+    async (taskId: string) => {
+      const res = await apiFetch<{ task_id: number }>(
+        `/api/v1/tasks/${taskId}/pause/`,
+        {
+          method: "POST",
+        },
+      );
+      if (!res.success) {
+        showToast(res.message || "Failed to pause task", "error");
+        return;
+      }
+      showToast("Task paused", "success");
+      await refresh();
+    },
+    [refresh, showToast],
+  );
+
+  const stopTask = useCallback(
+    async (taskId: string) => {
+      const res = await apiFetch<{ task_id: number }>(
+        `/api/v1/tasks/${taskId}/stop/`,
+        {
+          method: "POST",
+        },
+      );
+      if (!res.success) {
+        showToast(res.message || "Failed to stop task", "error");
+        return;
+      }
+      showToast("Task stopped", "success");
+      await refresh();
+    },
+    [refresh, showToast],
+  );
+
+  const completeTask = useCallback(
+    async (taskId: string) => {
+      const res = await apiFetch<{ task_id: number }>(
+        `/api/v1/tasks/${taskId}/status/`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ status: "COMPLETED" }),
+        },
+      );
+      if (!res.success) {
+        showToast(res.message || "Failed to complete task", "error");
+        return;
+      }
+      showToast("Task completed", "success");
+      await refresh();
+    },
+    [refresh, showToast],
+  );
+
+  const requestDeadlineChange = useCallback(
+    async (taskId: string, newDeadline: string, reason: string) => {
+      const res = await apiFetch<{ task_id: number }>(
+        `/api/v1/tasks/${taskId}/request-deadline-change/`,
+        {
+          method: "POST",
+          body: JSON.stringify({ new_deadline: newDeadline, reason }),
+        },
+      );
+      if (!res.success) {
+        showToast(res.message || "Deadline request failed", "error");
+        return;
+      }
+      showToast("Deadline change request sent", "success");
+      await refresh();
+    },
+    [refresh, showToast],
   );
 
   const myTasks = useMemo(
@@ -99,51 +283,74 @@ export function EmployeeTasksProvider({
       tasks.filter(
         (task) =>
           task.status === "Not Started" ||
-          task.status === "Pending" ||
           task.status === "In Progress" ||
-          task.status === "Paused",
+          task.status === "Paused" ||
+          task.status === "Stopped" ||
+          task.status === "Delayed",
       ),
     [tasks],
   );
 
   const historyTasks = useMemo(
-    () =>
-      tasks.filter(
-        (task) => task.status === "Completed" || task.status === "Auto-stopped",
-      ),
+    () => tasks.filter((task) => task.status === "Completed"),
     [tasks],
   );
 
   const activeTask = useMemo(() => {
-    const inProgress = tasks
-      .filter((task) => task.status === "In Progress")
-      .sort((a, b) => b.lastInteractionAt - a.lastInteractionAt);
-    if (inProgress.length > 0) {
-      return inProgress[0];
+    if (activeTaskFromApi !== null) {
+      const inProgressTask = tasks.find(
+        (task) => Number(task.id) === activeTaskFromApi,
+      );
+      if (inProgressTask) return inProgressTask;
     }
-
-    const paused = tasks
-      .filter((task) => task.status === "Paused")
-      .sort((a, b) => b.lastInteractionAt - a.lastInteractionAt);
-    return paused[0] ?? null;
-  }, [tasks]);
+    const lastTracked = recentActivity.find(
+      (item) => item.action !== "COMPLETED",
+    );
+    if (!lastTracked) return null;
+    const fallbackTask = tasks.find((task) => task.id === lastTracked.taskId);
+    if (!fallbackTask) return null;
+    if (
+      fallbackTask.status === "Completed" ||
+      fallbackTask.status === "Not Started"
+    ) {
+      return null;
+    }
+    return fallbackTask;
+  }, [activeTaskFromApi, recentActivity, tasks]);
 
   const value = useMemo<EmployeeTasksContextValue>(
     () => ({
+      loading,
       tasks,
       myTasks,
       historyTasks,
       activeTask,
-      startTask: (taskId) =>
-        runTransition(taskId, "In Progress", "Task started"),
-      pauseTask: (taskId) => runTransition(taskId, "Paused", "Task paused"),
-      stopTask: (taskId) => runTransition(taskId, "Completed", "Task stopped"),
-      completeTask: (taskId) =>
-        runTransition(taskId, "Completed", "Task completed"),
+      completedTasksCount,
+      recentActivity,
+      startTask,
+      pauseTask,
+      stopTask,
+      completeTask,
+      requestDeadlineChange,
+      refresh,
       canTransition: (status, nextStatus) =>
         isTransitionAllowed(status, nextStatus),
     }),
-    [tasks, myTasks, historyTasks, activeTask, runTransition],
+    [
+      loading,
+      tasks,
+      myTasks,
+      historyTasks,
+      activeTask,
+      completedTasksCount,
+      recentActivity,
+      startTask,
+      pauseTask,
+      stopTask,
+      completeTask,
+      requestDeadlineChange,
+      refresh,
+    ],
   );
 
   return (
