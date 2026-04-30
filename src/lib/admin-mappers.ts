@@ -71,27 +71,20 @@ function techStackLabel(t: string | null | undefined): string[] {
   return [map[t] ?? t];
 }
 
-/** Preset labels used in UserForm checkboxes (keep in sync with UserForm TECH_STACK). */
-const TECH_PRESETS = new Set([
-  "Next.js",
-  "React",
-  "TypeScript",
-  "JavaScript",
-  "Node.js",
-  "Express",
-  "Python",
-  "Django",
-  "AI/ML",
-  "WordPress",
-]);
-
 /**
  * Build `tech_notes` sent to API: presets + optional Other line.
  */
 export function buildTechNotes(techStack: string[], techOther: string): string {
-  const parts = [...techStack];
+  const parts = techStack.map((s) => s.trim()).filter(Boolean);
   const o = techOther.trim();
-  if (o) parts.push(`Other: ${o}`);
+  if (o) {
+    parts.push(
+      ...o
+        .split(/\r?\n|,/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }
   return parts.join(", ");
 }
 
@@ -105,19 +98,10 @@ export function parseTechFromApi(
     const parts = notes
       .split(",")
       .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => s.replace(/^other:\s*/i, "").trim())
       .filter(Boolean);
-    const selected: string[] = [];
-    let other = "";
-    for (const p of parts) {
-      if (/^other:/i.test(p)) {
-        other = p.replace(/^other:\s*/i, "").trim();
-      } else if (TECH_PRESETS.has(p)) {
-        selected.push(p);
-      } else if (p) {
-        other = other ? `${other}; ${p}` : p;
-      }
-    }
-    return { techStack: selected, techOther: other };
+    return { techStack: parts, techOther: "" };
   }
   return { techStack: techStackLabel(tech_stack), techOther: "" };
 }
@@ -164,10 +148,10 @@ export function apiUserToRecord(u: ApiUser): UserRecord {
 
 function designationToExp(d: string): "JUNIOR" | "SENIOR" | "" {
   if (d === "Senior Developer") return "SENIOR";
-  if (d === "Intern" || d === "Trainee" || d === "Junior Developer") {
+  if (d === "Intern" || d === "Junior Developer") {
     return "JUNIOR";
   }
-  return "";
+  return d.trim() as "JUNIOR" | "SENIOR" | "";
 }
 
 function devTypeToDepartment(
@@ -176,7 +160,7 @@ function devTypeToDepartment(
   if (t === "Frontend") return "FRONTEND";
   if (t === "Backend") return "BACKEND";
   if (t === "Fullstack") return "FULLSTACK";
-  return "";
+  return t.trim() as "FRONTEND" | "BACKEND" | "FULLSTACK" | "";
 }
 
 const TECH_TO_API: Record<string, string> = {
@@ -203,10 +187,14 @@ export function userFormToCreateBody(values: {
   const department = devTypeToDepartment(values.developerType);
   let tech_stack = "";
   for (const t of values.techStack) {
-    if (TECH_TO_API[t]) {
-      tech_stack = TECH_TO_API[t];
+    const normalized = t.trim();
+    if (!normalized) continue;
+    if (TECH_TO_API[normalized]) {
+      tech_stack = TECH_TO_API[normalized];
       break;
     }
+    tech_stack = normalized;
+    break;
   }
   const tech_notes =
     role === "EMPLOYEE"
@@ -224,8 +212,8 @@ export function userFormToCreateBody(values: {
     last_name: values.lastName.trim(),
     role,
     status: "ACTIVE",
-    experience_level: role === "EMPLOYEE" ? experience_level || "JUNIOR" : "",
-    department: role === "EMPLOYEE" ? department || "FRONTEND" : "",
+    experience_level: role === "EMPLOYEE" ? experience_level : "",
+    department: role === "EMPLOYEE" ? department : "",
     tech_stack:
       role === "EMPLOYEE"
         ? tech_stack || (tech_notes.trim() ? "PYTHON" : "")
@@ -250,10 +238,14 @@ export function userFormToPatchBody(values: {
   const department = devTypeToDepartment(values.developerType);
   let tech_stack = "";
   for (const t of values.techStack) {
-    if (TECH_TO_API[t]) {
-      tech_stack = TECH_TO_API[t];
+    const normalized = t.trim();
+    if (!normalized) continue;
+    if (TECH_TO_API[normalized]) {
+      tech_stack = TECH_TO_API[normalized];
       break;
     }
+    tech_stack = normalized;
+    break;
   }
   const tech_notes =
     role === "EMPLOYEE"
@@ -266,8 +258,8 @@ export function userFormToPatchBody(values: {
     last_name: values.lastName.trim(),
     role,
     status: "ACTIVE",
-    experience_level: role === "EMPLOYEE" ? experience_level || "JUNIOR" : "",
-    department: role === "EMPLOYEE" ? department || "FRONTEND" : "",
+    experience_level: role === "EMPLOYEE" ? experience_level : "",
+    department: role === "EMPLOYEE" ? department : "",
     tech_stack:
       role === "EMPLOYEE"
         ? tech_stack || (tech_notes.trim() ? "PYTHON" : "")
@@ -290,6 +282,7 @@ export type ApiProject = {
   deadline: string;
   status: string;
   document?: string | null;
+  progress_percent?: number | null;
 };
 
 function fileNameFromPath(path: string | null | undefined): string {
@@ -311,10 +304,12 @@ export function apiProjectToRow(p: ApiProject): Project {
     name: p.name,
     description: p.description ?? "",
     startDate: p.start_date,
-    endDate: p.deadline,
+    expectedDate: p.deadline,
     documentUrl: p.document ?? null,
     documentName: fileNameFromPath(p.document),
     status: statusLabel,
+    progressPercent:
+      typeof p.progress_percent === "number" ? p.progress_percent : null,
   };
 }
 
@@ -330,6 +325,7 @@ export type ApiMilestone = {
   start_date: string;
   end_date: string;
   status: string;
+  progress_percent?: number | null;
 };
 
 export function apiMilestoneToRecord(m: ApiMilestone): MilestoneRecord {
@@ -347,8 +343,10 @@ export function apiMilestoneToRecord(m: ApiMilestone): MilestoneRecord {
     name: m.name,
     description: m.description ?? "",
     startDate: m.start_date,
-    endDate: m.end_date,
+    expectedDate: m.end_date,
     status: milestoneStatus,
+    progressPercent:
+      typeof m.progress_percent === "number" ? m.progress_percent : null,
     assignedEmployees: [],
     watchers: [],
   };
@@ -444,7 +442,7 @@ export function apiTaskToRow(t: ApiTask): Task {
     employee: t.assigned_to_name ?? "",
     assignedBy: t.assigned_to != null ? String(t.assigned_to) : "",
     startDate: created,
-    endDate: deadline,
+    expectedDate: deadline,
     status: apiTaskStatusToUi(t.status),
     progress: deriveTaskProgress(t),
   };
@@ -459,8 +457,8 @@ export function buildTaskFormData(v: TaskFormValues): FormData {
     fd.append("milestone", v.milestone);
   }
   fd.append("status", uiTaskStatusToApi(v.status));
-  if (v.endDate) {
-    fd.append("deadline", v.endDate);
+  if (v.expectedDate) {
+    fd.append("deadline", v.expectedDate);
   }
   if (v.assignedBy.trim()) {
     fd.append("assigned_to", v.assignedBy.trim());

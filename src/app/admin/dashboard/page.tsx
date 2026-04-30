@@ -3,9 +3,9 @@
 import {
   CalendarClock,
   CircleCheck,
-  FolderKanban,
-  ListTodo,
-  UserCheck,
+  FolderPlus,
+  ListChecks,
+  UserRoundCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -228,10 +228,14 @@ export default function AdminDashboardPage() {
 
   const overviewStats = useMemo(
     () => [
-      { title: "Active Projects", value: stats.projects, icon: FolderKanban },
-      { title: "Tasks In Progress", value: stats.inProgress, icon: ListTodo },
+      { title: "Active Projects", value: stats.projects, icon: FolderPlus },
+      { title: "Tasks In Progress", value: stats.inProgress, icon: ListChecks },
       { title: "Completed Tasks", value: stats.completed, icon: CircleCheck },
-      { title: "Active Employees", value: stats.employees, icon: UserCheck },
+      {
+        title: "Active Employees",
+        value: stats.employees,
+        icon: UserRoundCheck,
+      },
     ],
     [stats],
   );
@@ -354,7 +358,9 @@ export default function AdminDashboardPage() {
           </span>
         </div>
 
-        <ActivityLog items={activityItems} />
+        <div className="max-h-[480px] overflow-y-auto pr-1">
+          <ActivityLog items={activityItems} />
+        </div>
       </section>
     </div>
   );

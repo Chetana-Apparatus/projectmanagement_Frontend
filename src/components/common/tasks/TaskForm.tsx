@@ -33,7 +33,7 @@ export type MilestoneOption = {
   name: string;
   projectId: string;
   /** YYYY-MM-DD from API */
-  endDate?: string;
+  expectedDate?: string;
 };
 
 export type TaskFormValues = {
@@ -43,7 +43,7 @@ export type TaskFormValues = {
   milestone: string;
   assignedBy: string;
   startDate: string;
-  endDate: string;
+  expectedDate: string;
   status: Task["status"];
 };
 
@@ -65,7 +65,7 @@ const emptyForm: TaskFormValues = {
   milestone: "",
   assignedBy: "",
   startDate: "",
-  endDate: "",
+  expectedDate: "",
   status: "Not Started",
 };
 
@@ -94,7 +94,9 @@ export default function TaskForm({
           milestone: initial.milestone,
           assignedBy: initial.assignedBy,
           startDate: initial.startDate,
-          endDate: initial.endDate ? initial.endDate.split("T")[0] : "",
+          expectedDate: initial.expectedDate
+            ? initial.expectedDate.split("T")[0]
+            : "",
           status: initial.status,
         }
       : emptyForm,
@@ -110,7 +112,9 @@ export default function TaskForm({
         milestone: initial.milestone,
         assignedBy: initial.assignedBy,
         startDate: initial.startDate,
-        endDate: initial.endDate ? initial.endDate.split("T")[0] : "",
+        expectedDate: initial.expectedDate
+          ? initial.expectedDate.split("T")[0]
+          : "",
         status: initial.status,
       });
       return;
@@ -127,16 +131,16 @@ export default function TaskForm({
   const selectedMilestone = milestones.find((m) => m.id === form.milestone);
 
   const validateExpectedDate = (
-    endDate: string,
+    expectedDate: string,
     projectId: string,
     milestoneId: string,
   ): string | null => {
-    const exp = ymdKey(endDate);
+    const exp = ymdKey(expectedDate);
     if (!exp) return null;
     const proj = projects.find((p) => p.id === projectId);
     const projCap = proj?.deadline ? ymdKey(proj.deadline) : null;
     const ms = milestones.find((m) => m.id === milestoneId);
-    const msCap = ms?.endDate ? ymdKey(ms.endDate) : null;
+    const msCap = ms?.expectedDate ? ymdKey(ms.expectedDate) : null;
     if (projCap && exp > projCap) {
       return `Expected date cannot be after the project deadline (${projCap}).`;
     }
@@ -154,7 +158,7 @@ export default function TaskForm({
           event.preventDefault();
           if (submitting) return;
           const err = validateExpectedDate(
-            form.endDate,
+            form.expectedDate,
             form.project,
             form.milestone,
           );
@@ -317,28 +321,28 @@ export default function TaskForm({
               htmlFor="task-expected-date"
               className="text-sm font-medium text-gray-700"
             >
-              Expected date
+              Expected Date
             </label>
             <Input
               id="task-expected-date"
               type="date"
               max={
-                [selectedMilestone?.endDate, selectedProject?.deadline]
+                [selectedMilestone?.expectedDate, selectedProject?.deadline]
                   .filter(Boolean)
                   .sort()
                   .at(0) ?? undefined
               }
-              value={form.endDate}
+              value={form.expectedDate}
               onChange={(e) => {
-                setForm({ ...form, endDate: e.target.value });
+                setForm({ ...form, expectedDate: e.target.value });
                 setDateError(null);
               }}
             />
             {selectedProject?.deadline ? (
               <p className="ui-caption text-muted-foreground">
                 Project deadline: {ymdKey(selectedProject.deadline)}
-                {selectedMilestone?.endDate
-                  ? ` · Milestone end: ${ymdKey(selectedMilestone.endDate)}`
+                {selectedMilestone?.expectedDate
+                  ? ` · Milestone end: ${ymdKey(selectedMilestone.expectedDate)}`
                   : null}
               </p>
             ) : null}

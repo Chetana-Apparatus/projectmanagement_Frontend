@@ -23,7 +23,7 @@ export type Task = {
   employee: string;
   assignedBy: string;
   startDate: string;
-  endDate: string;
+  expectedDate: string;
   /** Editable task status in forms (maps to API). */
   status:
     | "Not Started"
@@ -83,7 +83,7 @@ export default function TaskTable({
     { label: "Milestone", key: "milestone" },
     { label: "Assigned Employee", key: "employee" },
     { label: "Start Date", key: "startDate" },
-    { label: "Expected date", key: "endDate" },
+    { label: "Expected date", key: "expectedDate" },
     { label: "Progress", key: "progress" },
     ...(onEdit || onDelete ? [{ label: "Actions", key: "actions" }] : []),
   ];
@@ -141,9 +141,9 @@ export default function TaskTable({
             {row.startDate || "—"}
           </span>
         ),
-        endDate: (row) => (
+        expectedDate: (row) => (
           <span className="whitespace-nowrap text-sm tabular-nums text-cs-text">
-            {row.endDate ? row.endDate.split("T")[0] : "—"}
+            {row.expectedDate ? row.expectedDate.split("T")[0] : "—"}
           </span>
         ),
         progress: (row) => progressBadge(row.progress),

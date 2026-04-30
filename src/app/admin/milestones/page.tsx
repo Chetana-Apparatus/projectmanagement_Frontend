@@ -11,6 +11,7 @@ import MilestoneTable, {
   type MilestoneRecord,
 } from "@/components/common/milestones/MilestoneTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
+import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import {
@@ -27,13 +28,29 @@ import {
 import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
 function milestoneFormToFormData(values: MilestoneFormValues): FormData {
+  const statusMap: Record<MilestoneFormValues["status"], string> = {
+    "Not Started": "NOT_STARTED",
+    "In Progress": "IN_PROGRESS",
+    Completed: "COMPLETED",
+    Delayed: "DELAYED",
+  };
   const fd = new FormData();
   fd.append("project", values.projectId);
   fd.append("name", values.name.trim());
   fd.append("description", values.description?.trim() ?? "");
   fd.append("start_date", values.startDate);
-  fd.append("end_date", values.endDate);
+  fd.append("end_date", values.expectedDate);
+  fd.append("status", statusMap[values.status]);
   return fd;
+}
+
+function normalizeMilestoneFormStatus(
+  status: MilestoneRecord["status"],
+): MilestoneFormValues["status"] {
+  if (status === "Completed") return "Completed";
+  if (status === "In Progress") return "In Progress";
+  if (status === "Delayed") return "Delayed";
+  return "Not Started";
 }
 
 function AdminMilestonesPageContent() {
@@ -49,6 +66,10 @@ function AdminMilestonesPageContent() {
   const [deleteTarget, setDeleteTarget] = useState<MilestoneRecord | null>(
     null,
   );
+  const [projectModalId, setProjectModalId] = useState<number | null>(null);
+  const [projectFilter, setProjectFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [progressFilter, setProgressFilter] = useState("");
 
   const searchParams = useSearchParams();
   const milestoneIdFromUrl = searchParams.get("milestoneId");
@@ -67,6 +88,7 @@ function AdminMilestonesPageContent() {
         projRows.map((p) => ({
           id: String(p.id),
           label: p.name,
+          deadline: p.deadline,
         })),
       );
 
@@ -124,9 +146,25 @@ function AdminMilestonesPageContent() {
       name: editingMilestone.name,
       description: editingMilestone.description ?? "",
       startDate: editingMilestone.startDate,
-      endDate: editingMilestone.endDate,
+      expectedDate: editingMilestone.expectedDate,
+      status: normalizeMilestoneFormStatus(editingMilestone.status),
     };
   }, [editingMilestone]);
+
+  const filteredMilestones = useMemo(
+    () =>
+      milestones.filter((m) => {
+        if (projectFilter && m.projectId !== projectFilter) return false;
+        if (statusFilter && m.status !== statusFilter) return false;
+        const p = m.progressPercent ?? null;
+        if (progressFilter === "0-50" && !(p != null && p <= 50)) return false;
+        if (progressFilter === "51-75" && !(p != null && p > 50 && p <= 75))
+          return false;
+        if (progressFilter === "76-100" && !(p != null && p > 75)) return false;
+        return true;
+      }),
+    [milestones, projectFilter, statusFilter, progressFilter],
+  );
 
   const closeForm = () => {
     setFormMode(null);
@@ -188,11 +226,7 @@ function AdminMilestonesPageContent() {
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="h3">Milestone Management</h3>
-          <p className="ui-body-muted">
-            Plan project milestones, assign employees, and track stakeholder
-            watchers.
-          </p>
+          <h3 className="h2">Milestone Management</h3>
         </div>
         <Button type="button" onClick={() => setFormMode("create")}>
           <Plus size={16} />
@@ -203,15 +237,71 @@ function AdminMilestonesPageContent() {
       {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
       {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
 
+      <div className="rounded-xl border border-gray-200 bg-white p-3">
+        <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto py-0.5 sm:gap-x-3">
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+          >
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All status</option>
+            <option value="Not Started">Not Started</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="Delayed">Delayed</option>
+          </select>
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={progressFilter}
+            onChange={(e) => setProgressFilter(e.target.value)}
+          >
+            <option value="">Any progress</option>
+            <option value="0-50">0% - 50%</option>
+            <option value="51-75">51% - 75%</option>
+            <option value="76-100">76% - 100%</option>
+          </select>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setProjectFilter("");
+              setStatusFilter("");
+              setProgressFilter("");
+            }}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      </div>
+
       <MilestoneTable
-        milestones={milestones}
+        milestones={filteredMilestones}
         projectNameMap={projectNameMap}
         highlightRowId={highlightRowId}
+        onOpenProjectAction={(id) => setProjectModalId(Number(id))}
         onEdit={(milestone) => {
           setEditingMilestoneId(milestone.id);
           setFormMode("edit");
         }}
         onDelete={(milestone) => setDeleteTarget(milestone)}
+      />
+
+      <ProjectDetailModal
+        open={projectModalId != null}
+        projectId={projectModalId}
+        onClose={() => setProjectModalId(null)}
       />
 
       {formMode ? (

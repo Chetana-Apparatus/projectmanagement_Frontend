@@ -46,7 +46,7 @@ function BATasksPageContent() {
     { id: string; name: string; deadline: string }[]
   >([]);
   const [milestones, setMilestones] = useState<
-    { id: string; name: string; projectId: string; endDate: string }[]
+    { id: string; name: string; projectId: string; expectedDate: string }[]
   >([]);
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>(
     [],
@@ -97,7 +97,7 @@ function BATasksPageContent() {
           id: String(m.id),
           name: m.name,
           projectId: String(m.project),
-          endDate: m.end_date ? m.end_date.split("T")[0] : "",
+          expectedDate: m.end_date ? m.end_date.split("T")[0] : "",
         })),
       );
       setTasks(taskRows.map(apiTaskToRow));

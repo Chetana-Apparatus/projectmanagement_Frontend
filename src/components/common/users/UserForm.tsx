@@ -29,27 +29,7 @@ type Props = {
   onSubmit: (values: UserFormValues) => void;
 };
 
-const DESIGNATIONS = [
-  "Intern",
-  "Trainee",
-  "Junior Developer",
-  "Senior Developer",
-];
-
-const DEV_TYPES = ["Frontend", "Backend", "Fullstack"];
-
-const TECH_STACK = [
-  "Next.js",
-  "React",
-  "TypeScript",
-  "JavaScript",
-  "Node.js",
-  "Express",
-  "Python",
-  "Django",
-  "AI/ML",
-  "WordPress",
-];
+const DESIGNATIONS = ["Intern", "Junior Developer", "Senior Developer"];
 
 const initialState: UserFormValues = {
   firstName: "",
@@ -64,6 +44,8 @@ const initialState: UserFormValues = {
   techOther: "",
 };
 
+const OFFICE_EMAIL_DOMAIN = "@apparatus.solutions";
+
 export default function UserForm({
   mode,
   initialValues,
@@ -72,11 +54,13 @@ export default function UserForm({
 }: Props) {
   const [values, setValues] = useState(initialState);
   const [techError, setTechError] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   useEffect(() => {
     if (!initialValues) {
       setValues({ ...initialState });
       setTechError("");
+      setEmailError("");
       return;
     }
 
@@ -89,7 +73,9 @@ export default function UserForm({
       ...prev,
       firstName: initialValues.firstName || "",
       lastName: initialValues.lastName || "",
-      email: initialValues.email || "",
+      email: (initialValues.email || "")
+        .replace(new RegExp(`${OFFICE_EMAIL_DOMAIN}$`, "i"), "")
+        .trim(),
       password: "",
       role: initialValues.role ?? prev.role ?? "Employee",
       designation: initialValues.designation || "",
@@ -97,36 +83,62 @@ export default function UserForm({
       techStack: parsed.techStack.length
         ? parsed.techStack
         : initialValues.techStack || [],
-      techOther: parsed.techOther,
+      techOther: [...parsed.techStack, parsed.techOther]
+        .filter((x) => x && x.trim().length > 0)
+        .join("\n"),
     }));
   }, [initialValues]);
 
+  const parseTechLines = (raw: string): string[] =>
+    raw
+      .split(/\r?\n|,/g)
+      .map((s) => s.replace(/^\d+[).\-\s]+/, "").trim())
+      .filter(Boolean);
+
+  const validateOfficeEmailUser = (emailUser: string): string => {
+    const e = emailUser.trim().toLowerCase();
+    if (!e) return "Email username is required.";
+    if (e.includes("@")) {
+      return "Enter only the name part. Domain is fixed.";
+    }
+    if (!/^[a-z0-9._-]+$/.test(e)) {
+      return "Use only letters, numbers, dot, underscore or hyphen.";
+    }
+    return "";
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const emailValidation = validateOfficeEmailUser(values.email);
+    if (emailValidation) {
+      setEmailError(emailValidation);
+      return;
+    }
+    const email = `${values.email.trim().toLowerCase()}${OFFICE_EMAIL_DOMAIN}`;
     if (values.role === "Employee") {
-      const hasTech =
-        values.techStack.length > 0 || values.techOther.trim().length > 0;
+      const manualTech = parseTechLines(values.techOther);
+      const hasTech = manualTech.length > 0;
       if (!hasTech) {
-        setTechError("Select at least one tech or add details under Other.");
+        setTechError(
+          "Add at least one tech stack item (for example: NestJS, React).",
+        );
         return;
       }
+      setTechError("");
+      onSubmit({
+        ...values,
+        email,
+        techStack: manualTech,
+        techOther: "",
+      });
+      return;
     }
     setTechError("");
-    onSubmit(values);
+    setEmailError("");
+    onSubmit({ ...values, email });
   };
 
   const showEmployeeFields = values.role === "Employee";
-
-  const toggleTech = (label: string) => {
-    setTechError("");
-    setValues((prev) => {
-      const has = prev.techStack.includes(label);
-      const techStack = has
-        ? prev.techStack.filter((t) => t !== label)
-        : [...prev.techStack, label];
-      return { ...prev, techStack };
-    });
-  };
 
   return (
     <Card
@@ -171,13 +183,32 @@ export default function UserForm({
             >
               Email
             </label>
-            <Input
-              id="user-email"
-              className="h-11 w-full rounded-lg border px-3 text-sm"
-              placeholder="Enter email"
-              value={values.email}
-              onChange={(e) => setValues({ ...values, email: e.target.value })}
-            />
+            <div className="flex h-11 items-stretch overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-100">
+              <Input
+                id="user-email"
+                className="h-full w-full border-0 px-3 text-sm focus-visible:ring-0"
+                placeholder="name"
+                value={values.email}
+                onChange={(e) => {
+                  setEmailError("");
+                  setValues({
+                    ...values,
+                    email: e.target.value.replace(/\s+/g, ""),
+                  });
+                }}
+              />
+              <span className="inline-flex shrink-0 items-center border-l border-gray-200 bg-gray-50 px-3 text-sm font-medium text-gray-600">
+                {OFFICE_EMAIL_DOMAIN}
+              </span>
+            </div>
+            {!emailError ? (
+              <p className="text-xs text-gray-500">
+                Enter only username. Domain is fixed.
+              </p>
+            ) : null}
+            {emailError ? (
+              <p className="text-xs text-red-600">{emailError}</p>
+            ) : null}
           </div>
 
           {/* ROLE */}
@@ -248,84 +279,41 @@ export default function UserForm({
                 >
                   Developer Type
                 </label>
-                <select
+                <Input
                   id="user-developer-type"
+                  className="h-11 w-full rounded-lg border px-3 text-sm"
+                  placeholder="e.g. Frontend, Backend, DevOps"
                   value={values.developerType}
                   onChange={(e) =>
                     setValues({ ...values, developerType: e.target.value })
                   }
-                  className="h-11 w-full rounded-lg border px-3 text-sm"
-                >
-                  <option value="">Select Developer Type</option>
-                  {DEV_TYPES.map((d) => (
-                    <option key={d}>{d}</option>
-                  ))}
-                </select>
+                />
               </div>
 
-              {/* TECH STACK — checkboxes + Other */}
+              {/* TECH STACK — manual text */}
               <div className="space-y-1.5">
-                <span className="text-sm font-medium text-cs-heading">
+                <label
+                  htmlFor="user-tech-stack"
+                  className="text-sm font-medium text-cs-heading"
+                >
                   Tech Stack
-                </span>
+                </label>
                 <p className="text-xs text-gray-500">
-                  Select one or more. Use Other for anything not listed.
+                  Enter one tech per line, e.g. NestJS, React, DevOps.
                 </p>
-                <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                  {TECH_STACK.map((tech) => (
-                    <label
-                      key={tech}
-                      className="flex cursor-pointer items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300"
-                        checked={values.techStack.includes(tech)}
-                        onChange={() => toggleTech(tech)}
-                      />
-                      {tech}
-                    </label>
-                  ))}
-                </div>
-                <div className="space-y-1.5 pt-1">
-                  <label
-                    htmlFor="user-tech-other"
-                    className="text-sm text-gray-700"
-                  >
-                    Other (custom)
-                  </label>
-                  <Input
-                    id="user-tech-other"
-                    className="h-10 w-full rounded-lg border px-3 text-sm"
-                    placeholder="e.g. Kubernetes, Rust…"
-                    value={values.techOther}
-                    onChange={(e) => {
-                      setTechError("");
-                      setValues({ ...values, techOther: e.target.value });
-                    }}
-                  />
-                  {techError ? (
-                    <p className="text-xs text-red-600">{techError}</p>
-                  ) : null}
-                </div>
-                {(values.techStack.length > 0 ||
-                  values.techOther.trim().length > 0) && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {values.techStack.map((tech) => (
-                      <span
-                        key={tech}
-                        className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-600"
-                      >
-                        {tech}
-                      </span>
-                    ))}
-                    {values.techOther.trim() ? (
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
-                        Other: {values.techOther.trim()}
-                      </span>
-                    ) : null}
-                  </div>
-                )}
+                <textarea
+                  id="user-tech-stack"
+                  className="min-h-[110px] w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  placeholder={"1. NestJS\n2. React"}
+                  value={values.techOther}
+                  onChange={(e) => {
+                    setTechError("");
+                    setValues({ ...values, techOther: e.target.value });
+                  }}
+                />
+                {techError ? (
+                  <p className="text-xs text-red-600">{techError}</p>
+                ) : null}
               </div>
             </>
           ) : null}

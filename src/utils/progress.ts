@@ -1,7 +1,7 @@
-export function calculateProgress(startDate: string, endDate: string) {
+export function calculateProgress(startDate: string, expectedDate: string) {
   const now = new Date();
   const start = new Date(startDate);
-  const end = new Date(endDate);
+  const end = new Date(expectedDate);
 
   const total = end.getTime() - start.getTime();
   const current = now.getTime() - start.getTime();

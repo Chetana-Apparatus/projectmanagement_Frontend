@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Card from "@/components/common/card/Card";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import { Button } from "@/components/ui/Button";
@@ -45,12 +45,14 @@ function isLoginEnvelopeSuccess(body: unknown): body is LoginEnvelope & {
 
 /** TEMP integration: manual login against local Django while UI ships — remove comment when done. */
 const LoginPage = () => {
+  const LOGIN_TIMEOUT_MS = 15000;
   const router = useRouter();
   const { showToast } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const submitInFlightRef = useRef(false);
 
   const validateForm = () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -70,6 +72,7 @@ const LoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitInFlightRef.current) return;
 
     const validationError = validateForm();
     if (validationError) {
@@ -77,9 +80,15 @@ const LoginPage = () => {
       return;
     }
 
+    submitInFlightRef.current = true;
     setLoading(true);
+    let timeoutId: number | undefined;
     try {
       const normalizedEmail = email.trim().toLowerCase();
+      const controller = new AbortController();
+      timeoutId = window.setTimeout(() => {
+        controller.abort();
+      }, LOGIN_TIMEOUT_MS);
       const res = await fetch(apiUrl("/api/v1/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,6 +97,7 @@ const LoginPage = () => {
           password,
         }),
         cache: "no-store",
+        signal: controller.signal,
       });
 
       const body = (await res.json()) as
@@ -113,9 +123,15 @@ const LoginPage = () => {
       }
 
       showToast(messageFromUnknownBody(body), "error");
-    } catch {
-      showToast("Could not reach the server. Is the API running?", "error");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        showToast("Login request timed out. Please try again.", "error");
+      } else {
+        showToast("Could not reach the server. Is the API running?", "error");
+      }
     } finally {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      submitInFlightRef.current = false;
       setLoading(false);
     }
   };

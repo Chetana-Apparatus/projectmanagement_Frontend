@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export type DataTableColumn = {
   label: string;
   key: string;
+  align?: "left" | "center" | "right";
 };
 
 export type DataTableVisualVariant = "default" | "employee";
@@ -58,17 +59,42 @@ export default function DataTable<T extends Record<string, unknown>>({
         title: column.label,
         dataIndex: column.key,
         key: column.key,
+        align: column.align ?? "left",
         onHeaderCell: () => ({
           className:
             visualVariant === "employee"
-              ? "px-4 py-4 text-sm font-semibold text-gray-800 !bg-gray-50/95 border-b border-gray-200"
-              : "px-6 py-4 text-xs font-semibold uppercase text-gray-500",
+              ? `px-4 py-4 text-sm font-semibold text-gray-800 !bg-gray-50/95 border-b border-gray-200 ${
+                  column.align === "center"
+                    ? "text-center"
+                    : column.align === "right"
+                      ? "text-right"
+                      : "text-left"
+                }`
+              : `px-6 py-4 text-xs font-semibold uppercase text-gray-500 ${
+                  column.align === "center"
+                    ? "text-center"
+                    : column.align === "right"
+                      ? "text-right"
+                      : "text-left"
+                }`,
         }),
         onCell: () => ({
           className:
             visualVariant === "employee"
-              ? "px-4 py-4 align-middle text-sm text-gray-800 border-b border-gray-100"
-              : "px-6 py-4 align-top text-sm text-gray-700 whitespace-normal break-words",
+              ? `px-4 py-4 align-middle text-sm text-gray-800 border-b border-gray-100 ${
+                  column.align === "center"
+                    ? "text-center"
+                    : column.align === "right"
+                      ? "text-right"
+                      : "text-left"
+                }`
+              : `px-6 py-4 align-top text-sm text-gray-700 whitespace-normal break-words ${
+                  column.align === "center"
+                    ? "text-center"
+                    : column.align === "right"
+                      ? "text-right"
+                      : "text-left"
+                }`,
         }),
         render: (_value: unknown, row: T) => {
           const value = row[column.key];

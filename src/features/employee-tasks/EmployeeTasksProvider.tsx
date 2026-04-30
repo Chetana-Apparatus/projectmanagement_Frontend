@@ -30,6 +30,7 @@ type EmployeeDashboardPayload = {
 
 type EmployeeTaskApi = {
   id: number;
+  project?: number;
   project_name?: string;
   project_document?: string | null;
   milestone_name?: string | null;
@@ -108,6 +109,7 @@ export function EmployeeTasksProvider({
         }));
       return {
         id: String(task.id),
+        projectId: String(task.project ?? ""),
         project: task.project_name ?? "-",
         milestone: task.milestone_name ?? "-",
         task: task.title,
@@ -120,6 +122,37 @@ export function EmployeeTasksProvider({
         documents,
         lastInteractionAt: Date.now(),
       };
+    },
+    [],
+  );
+
+  const displayStatusFromActivity = useCallback(
+    (
+      task: EmployeeManagedTask,
+      latestActionByTaskId: Record<string, ActivityItem["action"]>,
+    ): EmployeeManagedTask => {
+      const latestAction = latestActionByTaskId[task.id];
+      if (!latestAction) return task;
+      // Backend maps stop action to PAUSED status. Only reinterpret PAUSED
+      // as STOPPED when latest activity confirms a stop event.
+      if (
+        latestAction === "STOPPED" &&
+        task.status === "Paused" &&
+        task.status !== "Completed"
+      ) {
+        return { ...task, status: "Stopped" };
+      }
+      if (
+        latestAction === "PAUSED" &&
+        task.status !== "Completed" &&
+        task.status !== "In Progress"
+      ) {
+        return { ...task, status: "Paused" };
+      }
+      if (latestAction === "STARTED" && task.status !== "Completed") {
+        return { ...task, status: "In Progress" };
+      }
+      return task;
     },
     [],
   );
@@ -138,12 +171,6 @@ export function EmployeeTasksProvider({
         setActiveTaskFromApi(dashboardRes.data.active_task?.id ?? null);
       }
 
-      if (tasksRes.success && tasksRes.data) {
-        setTasks(tasksRes.data.map(buildManagedTask));
-      } else {
-        setTasks([]);
-      }
-
       let workTracking: WorkTrackingPayload = { recent_activity: [] };
       try {
         workTracking = await fetchWorkTracking();
@@ -153,21 +180,38 @@ export function EmployeeTasksProvider({
 
       const activityRows = (workTracking.recent_activity ??
         []) as WorkTrackingPayload["recent_activity"];
-      setRecentActivity(
-        (activityRows ?? [])
-          .slice()
-          .sort(
-            (a, b) =>
-              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-          )
-          .map((item, idx) => ({
-            id: `${item.task_id}-${item.timestamp}-${idx}`,
-            taskId: String(item.task_id),
-            action: item.action,
-            description: `${item.employee_name} ${item.action.toLowerCase()} task "${item.task_title}" in ${item.project_name}`,
-            time: new Date(item.timestamp).toLocaleString(),
-          })),
-      );
+      const normalizedActivity = (activityRows ?? [])
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        )
+        .map((item, idx) => ({
+          id: `${item.task_id}-${item.timestamp}-${idx}`,
+          taskId: String(item.task_id),
+          action: item.action,
+          description: `${item.employee_name} ${item.action.toLowerCase()} task "${item.task_title}" in ${item.project_name}`,
+          time: new Date(item.timestamp).toLocaleString(),
+        }));
+      setRecentActivity(normalizedActivity);
+
+      const latestActionByTaskId: Record<string, ActivityItem["action"]> = {};
+      for (const item of normalizedActivity) {
+        if (!latestActionByTaskId[item.taskId]) {
+          latestActionByTaskId[item.taskId] = item.action;
+        }
+      }
+
+      if (tasksRes.success && tasksRes.data) {
+        const mappedTasks = tasksRes.data.map(buildManagedTask);
+        setTasks(
+          mappedTasks.map((task) =>
+            displayStatusFromActivity(task, latestActionByTaskId),
+          ),
+        );
+      } else {
+        setTasks([]);
+      }
     } catch (e) {
       showToast(
         e instanceof Error ? e.message : "Failed to load employee data",
@@ -176,7 +220,7 @@ export function EmployeeTasksProvider({
     } finally {
       setLoading(false);
     }
-  }, [buildManagedTask, showToast]);
+  }, [buildManagedTask, displayStatusFromActivity, showToast]);
 
   useEffect(() => {
     void refresh();

@@ -47,7 +47,7 @@ function AdminTasksPageContent() {
     { id: string; name: string; deadline: string }[]
   >([]);
   const [milestoneOptions, setMilestoneOptions] = useState<
-    { id: string; name: string; projectId: string; endDate: string }[]
+    { id: string; name: string; projectId: string; expectedDate: string }[]
   >([]);
   const [employeeOptions, setEmployeeOptions] = useState<
     { id: string; name: string }[]
@@ -100,7 +100,7 @@ function AdminTasksPageContent() {
           id: String(m.id),
           name: m.name,
           projectId: String(m.project),
-          endDate: m.end_date ? m.end_date.split("T")[0] : "",
+          expectedDate: m.end_date ? m.end_date.split("T")[0] : "",
         })),
       );
 

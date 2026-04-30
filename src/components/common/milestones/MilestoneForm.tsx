@@ -8,6 +8,7 @@ import Input from "@/components/ui/Input";
 export type SelectOption = {
   id: string;
   label: string;
+  deadline?: string;
 };
 
 export type MilestoneFormValues = {
@@ -15,7 +16,8 @@ export type MilestoneFormValues = {
   name: string;
   description: string;
   startDate: string;
-  endDate: string;
+  expectedDate: string;
+  status: "Not Started" | "In Progress" | "Completed" | "Delayed";
 };
 
 type MilestoneFormProps = {
@@ -33,7 +35,8 @@ const emptyForm: MilestoneFormValues = {
   name: "",
   description: "",
   startDate: "",
-  endDate: "",
+  expectedDate: "",
+  status: "Not Started",
 };
 
 export default function MilestoneForm({
@@ -69,14 +72,24 @@ export default function MilestoneForm({
     if (!values.projectId.trim()) nextErrors.projectId = "Project is required";
     if (!values.name.trim()) nextErrors.name = "Milestone name is required";
     if (!values.startDate) nextErrors.startDate = "Start date is required";
-    if (!values.endDate) nextErrors.endDate = "End date is required";
+    if (!values.expectedDate)
+      nextErrors.expectedDate = "Expected date is required";
 
     if (
       values.startDate &&
-      values.endDate &&
-      values.endDate < values.startDate
+      values.expectedDate &&
+      values.expectedDate < values.startDate
     ) {
-      nextErrors.endDate = "End date cannot be before start date";
+      nextErrors.expectedDate = "Expected date cannot be before start date";
+    }
+    const selectedProject = projects.find((p) => p.id === values.projectId);
+    if (
+      selectedProject?.deadline &&
+      values.expectedDate &&
+      values.expectedDate > selectedProject.deadline
+    ) {
+      nextErrors.expectedDate =
+        "Expected date cannot be after the project deadline";
     }
 
     setErrors(nextErrors);
@@ -139,6 +152,28 @@ export default function MilestoneForm({
             )}
           </div>
 
+          <div className={fieldClass}>
+            <label htmlFor="milestone-status" className={labelClass}>
+              Status
+            </label>
+            <select
+              id="milestone-status"
+              value={values.status}
+              onChange={(e) =>
+                setField(
+                  "status",
+                  e.target.value as MilestoneFormValues["status"],
+                )
+              }
+              className={selectClass}
+            >
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Delayed">Delayed</option>
+            </select>
+          </div>
+
           {/* NAME */}
           <div className={fieldClass}>
             <label htmlFor="milestone-name" className={labelClass}>
@@ -188,16 +223,22 @@ export default function MilestoneForm({
 
             <div className={fieldClass}>
               <label htmlFor="milestone-end-date" className={labelClass}>
-                End Date
+                Expected Date
               </label>
               <Input
                 id="milestone-end-date"
                 className="h-11 w-full rounded-lg border px-3 text-sm"
                 type="date"
-                value={values.endDate}
-                onChange={(e) => setField("endDate", e.target.value)}
+                value={values.expectedDate}
+                onChange={(e) => setField("expectedDate", e.target.value)}
+                max={
+                  projects.find((p) => p.id === values.projectId)?.deadline ??
+                  undefined
+                }
               />
-              {errors.endDate && <p className={errorClass}>{errors.endDate}</p>}
+              {errors.expectedDate && (
+                <p className={errorClass}>{errors.expectedDate}</p>
+              )}
             </div>
           </div>
         </div>

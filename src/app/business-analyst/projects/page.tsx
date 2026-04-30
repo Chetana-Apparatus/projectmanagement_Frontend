@@ -2,7 +2,7 @@
 
 import { Plus, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import ProjectForm, {
   type ProjectFormValues,
 } from "@/components/common/projects/ProjectForm";
@@ -10,6 +10,7 @@ import ProjectTable, {
   type Project,
 } from "@/components/common/projects/ProjectTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
+import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import { type ApiProject, apiProjectToRow } from "@/lib/admin-mappers";
@@ -22,13 +23,29 @@ import {
 import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
 function buildProjectFormData(values: ProjectFormValues): FormData {
+  const statusMap: Record<ProjectFormValues["status"], string> = {
+    "Not Started": "PLANNED",
+    "In Progress": "ACTIVE",
+    Completed: "COMPLETED",
+    Delayed: "DELAYED",
+  };
   const fd = new FormData();
   fd.append("name", values.name.trim());
   fd.append("description", values.description ?? "");
   fd.append("start_date", values.startDate);
-  fd.append("deadline", values.endDate);
-  if (values.document) fd.append("document", values.document);
+  fd.append("deadline", values.expectedDate);
+  fd.append("status", statusMap[values.status]);
+  if (values.documents[0]) fd.append("document", values.documents[0]);
   return fd;
+}
+
+function normalizeProjectFormStatus(
+  status: Project["status"],
+): ProjectFormValues["status"] {
+  if (status === "Completed") return "Completed";
+  if (status === "In Progress") return "In Progress";
+  if (status === "Delayed") return "Delayed";
+  return "Not Started";
 }
 
 function BAProjectsPageContent() {
@@ -38,7 +55,7 @@ function BAProjectsPageContent() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
-  const [editingOriginalEndDate, setEditingOriginalEndDate] =
+  const [editingOriginalexpectedDate, setEditingOriginalexpectedDate] =
     useState<string>("");
   const [pendingDeadlineRequest, setPendingDeadlineRequest] = useState<{
     projectId: string;
@@ -48,6 +65,36 @@ function BAProjectsPageContent() {
   const [deadlineReason, setDeadlineReason] = useState("");
   const [submittingDeadlineRequest, setSubmittingDeadlineRequest] =
     useState(false);
+  const [projectModalId, setProjectModalId] = useState<number | null>(null);
+  const [projectFilter, setProjectFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [progressFilter, setProgressFilter] = useState("");
+  const uploadExtraProjectFiles = async (projectId: string, files: File[]) => {
+    const extras = files.slice(1);
+    await Promise.all(
+      extras.map(async (file) => {
+        const attachFd = new FormData();
+        attachFd.append("project", projectId);
+        attachFd.append("file", file);
+        await drfFormDataPost("/api/v1/files/", attachFd);
+      }),
+    );
+  };
+
+  const filteredProjects = useMemo(
+    () =>
+      projects.filter((project) => {
+        if (projectFilter && project.id !== projectFilter) return false;
+        if (statusFilter && project.status !== statusFilter) return false;
+        const p = project.progressPercent ?? null;
+        if (progressFilter === "0-50" && !(p != null && p <= 50)) return false;
+        if (progressFilter === "51-75" && !(p != null && p > 50 && p <= 75))
+          return false;
+        if (progressFilter === "76-100" && !(p != null && p > 75)) return false;
+        return true;
+      }),
+    [projects, projectFilter, statusFilter, progressFilter],
+  );
 
   const searchParams = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId");
@@ -77,7 +124,7 @@ function BAProjectsPageContent() {
     const p = projects.find((row) => row.id === projectIdFromUrl);
     if (p) {
       setEditing(p);
-      setEditingOriginalEndDate(p.endDate);
+      setEditingOriginalexpectedDate(p.expectedDate);
       setOpen(true);
     }
   }, [loading, projects, projectIdFromUrl, nfFromUrl]);
@@ -100,7 +147,7 @@ function BAProjectsPageContent() {
   const closeForm = () => {
     setOpen(false);
     setEditing(null);
-    setEditingOriginalEndDate("");
+    setEditingOriginalexpectedDate("");
     stripDeepLinkParams(["projectId", NOTIF_FOCUS_PARAM]);
   };
 
@@ -129,12 +176,20 @@ function BAProjectsPageContent() {
       fdWithoutDeadline.append("name", values.name.trim());
       fdWithoutDeadline.append("description", values.description ?? "");
       fdWithoutDeadline.append("start_date", values.startDate);
-      if (values.document)
-        fdWithoutDeadline.append("document", values.document);
+      const statusMap: Record<ProjectFormValues["status"], string> = {
+        "Not Started": "PLANNED",
+        "In Progress": "ACTIVE",
+        Completed: "COMPLETED",
+        Delayed: "DELAYED",
+      };
+      fdWithoutDeadline.append("status", statusMap[values.status]);
+      if (values.documents[0])
+        fdWithoutDeadline.append("document", values.documents[0]);
       await drfFormDataPatch<ApiProject>(
         `/api/v1/projects/${projectId}/`,
         fdWithoutDeadline,
       );
+      await uploadExtraProjectFiles(projectId, values.documents);
       showToast("Project updated. Deadline request sent to admin.", "success");
       await loadProjects();
       setPendingDeadlineRequest(null);
@@ -154,10 +209,10 @@ function BAProjectsPageContent() {
     try {
       const fd = buildProjectFormData(values);
       if (editing) {
-        const requestedDeadline = values.endDate;
+        const requestedDeadline = values.expectedDate;
         if (
-          editingOriginalEndDate &&
-          requestedDeadline !== editingOriginalEndDate
+          editingOriginalexpectedDate &&
+          requestedDeadline !== editingOriginalexpectedDate
         ) {
           setPendingDeadlineRequest({
             projectId: editing.id,
@@ -166,14 +221,19 @@ function BAProjectsPageContent() {
           });
           return;
         } else {
-          await drfFormDataPatch<ApiProject>(
+          const updated = await drfFormDataPatch<ApiProject>(
             `/api/v1/projects/${editing.id}/`,
             fd,
           );
+          await uploadExtraProjectFiles(String(updated.id), values.documents);
           showToast("Project updated", "success");
         }
       } else {
-        await drfFormDataPost<ApiProject>("/api/v1/projects/", fd);
+        const created = await drfFormDataPost<ApiProject>(
+          "/api/v1/projects/",
+          fd,
+        );
+        await uploadExtraProjectFiles(String(created.id), values.documents);
         showToast("Project created", "success");
       }
       await loadProjects();
@@ -195,15 +255,71 @@ function BAProjectsPageContent() {
       {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
       {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
 
+      <div className="rounded-xl border border-gray-200 bg-white p-3">
+        <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto py-0.5 sm:gap-x-3">
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+          >
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All status</option>
+            <option value="Not Started">Not Started</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="Delayed">Delayed</option>
+          </select>
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={progressFilter}
+            onChange={(e) => setProgressFilter(e.target.value)}
+          >
+            <option value="">Any progress</option>
+            <option value="0-50">0% - 50%</option>
+            <option value="51-75">51% - 75%</option>
+            <option value="76-100">76% - 100%</option>
+          </select>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setProjectFilter("");
+              setStatusFilter("");
+              setProgressFilter("");
+            }}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      </div>
+
       <ProjectTable
-        projects={projects}
+        projects={filteredProjects}
         allowDelete={false}
         highlightRowId={highlightRowId}
+        onOpenProject={(id) => setProjectModalId(Number(id))}
         onEdit={(project) => {
           setEditing(project);
-          setEditingOriginalEndDate(project.endDate);
+          setEditingOriginalexpectedDate(project.expectedDate);
           setOpen(true);
         }}
+      />
+
+      <ProjectDetailModal
+        open={projectModalId != null}
+        projectId={projectModalId}
+        onClose={() => setProjectModalId(null)}
       />
 
       {open && (
@@ -229,13 +345,15 @@ function BAProjectsPageContent() {
                       name: editing.name,
                       description: editing.description,
                       startDate: editing.startDate,
-                      endDate: editing.endDate,
-                      document: null,
+                      expectedDate: editing.expectedDate,
+                      status: normalizeProjectFormStatus(editing.status),
+                      documents: [],
                     }
                   : undefined
               }
               onSubmit={handleSubmit}
               onCancel={closeForm}
+              statusEditable={false}
             />
           </div>
         </div>

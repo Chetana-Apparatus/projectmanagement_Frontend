@@ -10,34 +10,48 @@ export type ProjectFormValues = {
   name: string;
   description: string;
   startDate: string;
-  endDate: string;
-  document: File | null;
+  expectedDate: string;
+  status: "Not Started" | "In Progress" | "Completed" | "Delayed";
+  documents: File[];
 };
 
 type Props = {
   initialValues?: ProjectFormValues;
   onSubmit: (values: ProjectFormValues) => void;
   onCancel: () => void;
+  statusEditable?: boolean;
 };
 
 export default function ProjectForm({
   initialValues,
   onSubmit,
   onCancel,
+  statusEditable = true,
 }: Props) {
   const [form, setForm] = useState<ProjectFormValues>({
     name: "",
     description: "",
     startDate: "",
-    endDate: "",
-    document: null,
+    expectedDate: "",
+    status: "Not Started",
+    documents: [],
   });
 
   const [dragOver, setDragOver] = useState(false);
   const [documentError, setDocumentError] = useState("");
 
   useEffect(() => {
-    if (!initialValues) return;
+    if (!initialValues) {
+      setForm({
+        name: "",
+        description: "",
+        startDate: "",
+        expectedDate: "",
+        status: "Not Started",
+        documents: [],
+      });
+      return;
+    }
     setForm(initialValues);
   }, [initialValues]);
 
@@ -51,14 +65,16 @@ export default function ProjectForm({
     return lowerName.endsWith(".docx") || lowerName.endsWith(".md");
   };
 
-  const updateDocument = (file: File | null) => {
-    if (!file) return;
-    if (!isSupportedFile(file)) {
+  const updateDocuments = (files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return;
+    const next = Array.from(files);
+    const bad = next.find((file) => !isSupportedFile(file));
+    if (bad) {
       setDocumentError("Only .docx and .md files are allowed.");
       return;
     }
     setDocumentError("");
-    setForm((prev) => ({ ...prev, document: file }));
+    setForm((prev) => ({ ...prev, documents: next }));
   };
 
   return (
@@ -131,16 +147,41 @@ export default function ProjectForm({
 
             <div className="space-y-1.5">
               <label htmlFor="project-end-date" className="text-sm font-medium">
-                End Date
+                Expected Date
               </label>
               <Input
                 id="project-end-date"
                 type="date"
                 className="h-11 w-full rounded-lg px-3"
-                value={form.endDate}
-                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                value={form.expectedDate}
+                onChange={(e) =>
+                  setForm({ ...form, expectedDate: e.target.value })
+                }
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="project-status" className="text-sm font-medium">
+              Status
+            </label>
+            <select
+              id="project-status"
+              className="h-11 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cs-primary-100/30"
+              value={form.status}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  status: e.target.value as ProjectFormValues["status"],
+                })
+              }
+              disabled={!statusEditable}
+            >
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Delayed">Delayed</option>
+            </select>
           </div>
 
           {/* DOCUMENT */}
@@ -156,7 +197,7 @@ export default function ProjectForm({
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOver(false);
-                updateDocument(e.dataTransfer.files?.[0] || null);
+                updateDocuments(e.dataTransfer.files);
               }}
               className={`rounded-lg border-2 border-dashed p-5 text-center transition ${
                 dragOver
@@ -167,23 +208,24 @@ export default function ProjectForm({
               <Upload size={22} className="mx-auto mb-2 text-gray-500" />
 
               <p className="text-sm font-medium">
-                Drag & drop .docx or .md file here
+                Drag & drop .docx or .md files here
               </p>
               <p className="mb-3 text-xs text-gray-500">or upload manually</p>
 
               <label className="inline-block cursor-pointer rounded-md border px-3 py-1.5 text-sm hover:bg-gray-100">
-                Browse file
+                Browse files
                 <input
                   type="file"
                   accept=".docx,.md"
+                  multiple
                   className="hidden"
-                  onChange={(e) => updateDocument(e.target.files?.[0] || null)}
+                  onChange={(e) => updateDocuments(e.target.files)}
                 />
               </label>
 
-              {form.document && (
+              {form.documents.length > 0 && (
                 <p className="mt-3 truncate text-xs text-green-600">
-                  {form.document.name}
+                  {form.documents.length} file(s) selected
                 </p>
               )}
               {documentError && (

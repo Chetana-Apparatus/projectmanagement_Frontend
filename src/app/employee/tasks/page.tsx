@@ -7,13 +7,15 @@ import {
   ChevronDown,
   Download,
   FileText,
+  FolderOpen,
   PauseCircle,
   PlayCircle,
   StopCircle,
 } from "lucide-react";
-import { type CSSProperties, Suspense, useState } from "react";
+import { type CSSProperties, type ReactNode, Suspense, useState } from "react";
 import Card from "@/components/common/card/Card";
 import { useToast } from "@/components/common/toast/ToastProvider";
+import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
@@ -82,6 +84,7 @@ function EmployeeTasksPageContent() {
   const [deadlineTaskId, setDeadlineTaskId] = useState<string | null>(null);
   const [requestedDeadline, setRequestedDeadline] = useState("");
   const [deadlineReason, setDeadlineReason] = useState("");
+  const [projectModalId, setProjectModalId] = useState<number | null>(null);
 
   const highlightRowId = useNotificationTableHighlight(
     loading,
@@ -167,11 +170,11 @@ function EmployeeTasksPageContent() {
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
       render: (_, record) =>
-        record.documents.length > 0 ? (
+        record.projectId ? (
           <button
             type="button"
             className="max-w-full cursor-pointer text-left text-blue-600 hover:underline"
-            onClick={() => openProjectDocuments(record)}
+            onClick={() => setProjectModalId(Number(record.projectId))}
           >
             <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
               {record.project}
@@ -303,96 +306,71 @@ function EmployeeTasksPageContent() {
         })();
 
         const secondaryMenuItems = (() => {
-          if (record.status === "In Progress") {
-            const items = [
-              {
-                key: "pause",
-                label: "Pause",
-                icon: <PauseCircle className="size-4" />,
-                disabled: disableAllActions || !canPause,
-                onClick: () => pauseTask(record.id),
-              },
-              {
-                key: "complete",
-                label: "Complete",
-                icon: <Check className="size-4" />,
-                disabled: disableAllActions,
-                onClick: () => handleComplete(record.id, record.status),
-              },
-            ];
-            if (showDeadlineRequest) {
-              items.push({
-                key: "deadline",
-                label: "Request Deadline",
-                icon: <FileText className="size-4" />,
-                disabled: disableAllActions,
-                onClick: openRequestDeadlineModal,
-              });
-            }
-            return items;
+          const items: {
+            key: string;
+            label: string;
+            icon: ReactNode;
+            disabled: boolean;
+            onClick: () => void;
+          }[] = [];
+
+          items.push({
+            key: "documents",
+            label: "Project documents",
+            icon: <FolderOpen className="size-4" />,
+            disabled: disableAllActions,
+            onClick: () => openProjectDocuments(record),
+          });
+
+          if (canStart) {
+            items.push({
+              key: "start",
+              label:
+                record.status === "Paused" || record.status === "Stopped"
+                  ? "Resume"
+                  : "Start",
+              icon: <PlayCircle className="size-4" />,
+              disabled: disableAllActions || !canStart,
+              onClick: () => startTask(record.id),
+            });
           }
-          if (record.status === "Paused") {
-            const items = [
-              {
-                key: "resume",
-                label: "Resume",
-                icon: <PlayCircle className="size-4" />,
-                disabled: disableAllActions || !canStart,
-                onClick: () => startTask(record.id),
-              },
-              {
-                key: "stop",
-                label: "Stop",
-                icon: <StopCircle className="size-4" />,
-                disabled: disableAllActions || !canStop,
-                onClick: () => handleStop(record.id),
-              },
-            ];
-            if (showDeadlineRequest) {
-              items.push({
-                key: "deadline",
-                label: "Request Deadline",
-                icon: <FileText className="size-4" />,
-                disabled: disableAllActions,
-                onClick: openRequestDeadlineModal,
-              });
-            }
-            return items;
+          if (canPause) {
+            items.push({
+              key: "pause",
+              label: "Pause",
+              icon: <PauseCircle className="size-4" />,
+              disabled: disableAllActions || !canPause,
+              onClick: () => pauseTask(record.id),
+            });
           }
-          if (record.status === "Stopped") {   
-            const items = [
-              {
-                key: "complete",
-                label: "Complete",
-                icon: <Check className="size-4" />,
-                disabled: disableAllActions || !canComplete,
-                onClick: () => handleComplete(record.id, record.status),
-              },
-            ];
-            if (showDeadlineRequest) {
-              items.push({
-                key: "deadline",
-                label: "Request Deadline",
-                icon: <FileText className="size-4" />,
-                disabled: disableAllActions,
-                onClick: openRequestDeadlineModal,
-              });
-            }
-            return items;
+          if (canStop) {
+            items.push({
+              key: "stop",
+              label: "Stop",
+              icon: <StopCircle className="size-4" />,
+              disabled: disableAllActions || !canStop,
+              onClick: () => handleStop(record.id),
+            });
           }
-          if (record.status === "Not Started") {
-            if (!showDeadlineRequest) return [];
-            return [
-              {
-                key: "deadline",
-                label: "Request Deadline",
-                icon: <FileText className="size-4" />,
-                disabled: disableAllActions,
-                onClick: openRequestDeadlineModal,
-              },
-            ];
+          if (canComplete) {
+            items.push({
+              key: "complete",
+              label: "Complete",
+              icon: <Check className="size-4" />,
+              disabled: disableAllActions || !canComplete,
+              onClick: () => handleComplete(record.id, record.status),
+            });
           }
-          return [];
+          if (showDeadlineRequest) {
+            items.push({
+              key: "deadline",
+              label: "Request Deadline",
+              icon: <FileText className="size-4" />,
+              disabled: disableAllActions,
+              onClick: openRequestDeadlineModal,
+            });
+          }
+          return items;
         })();
 
         return (
@@ -452,6 +430,12 @@ function EmployeeTasksPageContent() {
           />
         </div>
       </Card>
+
+      <ProjectDetailModal
+        open={projectModalId != null}
+        projectId={projectModalId}
+        onClose={() => setProjectModalId(null)}
+      />
 
       <Modal
         title="Project Documents"
@@ -538,7 +522,3 @@ function EmployeeTasksPageContent() {
     </div>
   );
 }
-
-
-
-// "testinggfgf"

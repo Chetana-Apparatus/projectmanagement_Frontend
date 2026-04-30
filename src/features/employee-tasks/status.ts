@@ -19,6 +19,7 @@ export type TaskDocument = {
 
 export type EmployeeManagedTask = {
   id: string;
+  projectId: string;
   project: string;
   milestone: string;
   task: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import { Progress } from "antd";
 import { Pencil, Trash2 } from "lucide-react";
 import DataTable, {
   type DataTableColumn,
@@ -12,7 +13,7 @@ export type MilestoneRecord = {
   name: string;
   description: string;
   startDate: string;
-  endDate: string;
+  expectedDate: string;
   status:
     | "Not Started"
     | "In Progress"
@@ -20,6 +21,7 @@ export type MilestoneRecord = {
     | "Delayed"
     | "Paused"
     | "Blocked";
+  progressPercent: number | null;
   assignedEmployees: string[];
   watchers: string[];
 };
@@ -30,6 +32,7 @@ type MilestoneTableProps = {
   onEdit: (milestone: MilestoneRecord) => void;
   onDelete: (milestone: MilestoneRecord) => void;
   highlightRowId?: string | null;
+  onOpenProjectAction?: (projectId: string) => void;
 };
 
 export default function MilestoneTable({
@@ -38,33 +41,47 @@ export default function MilestoneTable({
   onEdit,
   onDelete,
   highlightRowId = null,
+  onOpenProjectAction,
 }: MilestoneTableProps) {
-  const progressBadge = (status: MilestoneRecord["status"]) => {
-    const styleMap: Record<MilestoneRecord["status"], string> = {
-      Completed: "bg-emerald-100 text-emerald-700",
-      "In Progress": "bg-blue-100 text-blue-700",
-      Paused: "bg-amber-100 text-amber-700",
-      Delayed: "bg-orange-100 text-orange-700",
-      Blocked: "bg-rose-100 text-rose-700",
-      "Not Started": "bg-slate-100 text-slate-700",
-    };
+  const getProgressValue = (status: MilestoneRecord["status"]) => {
+    if (status === "Completed") return 100;
+    if (status === "In Progress") return 75;
+    if (status === "Delayed" || status === "Paused") return 50;
+    return 25;
+  };
+
+  const getProgressColor = (value: number) => {
+    if (value > 75) return "#16a34a"; // green: > 75
+    if (value > 50) return "#2563eb"; // blue: 51-75
+    return "#dc2626"; // red: 0-50
+  };
+
+  const progressBar = (row: MilestoneRecord) => {
+    const percent =
+      typeof row.progressPercent === "number"
+        ? Math.max(0, Math.min(100, Math.round(row.progressPercent)))
+        : getProgressValue(row.status);
     return (
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-medium ${styleMap[status]}`}
-      >
-        {status}
-      </span>
+      <div className="mx-auto w-[160px]">
+        <Progress
+          percent={percent}
+          size="small"
+          strokeColor={getProgressColor(percent)}
+          trailColor="#e5e7eb"
+          format={(value) => `${value ?? 0}%`}
+        />
+      </div>
     );
   };
 
   const columns: DataTableColumn[] = [
-    { label: "Project Name", key: "projectName" },
-    { label: "Milestone Name", key: "name" },
-    { label: "Description", key: "description" },
-    { label: "Start Date", key: "startDate" },
-    { label: "Deadline", key: "endDate" },
-    { label: "Progress", key: "progress" },
-    { label: "Actions", key: "actions" },
+    { label: "Project Name", key: "projectName", align: "center" },
+    { label: "Milestone Name", key: "name", align: "center" },
+    { label: "Description", key: "description", align: "center" },
+    { label: "Start Date", key: "startDate", align: "center" },
+    { label: "Deadline", key: "expectedDate", align: "center" },
+    { label: "Progress", key: "progress", align: "center" },
+    { label: "Actions", key: "actions", align: "center" },
   ];
 
   return (
@@ -74,17 +91,29 @@ export default function MilestoneTable({
       emptyMessage="No milestones found"
       highlightRowId={highlightRowId}
       renderers={{
-        projectName: (row) => projectNameMap[row.projectId] ?? row.projectId,
+        projectName: (row) => {
+          const label = projectNameMap[row.projectId] ?? row.projectId;
+          if (!onOpenProjectAction) return label;
+          return (
+            <button
+              type="button"
+              onClick={() => onOpenProjectAction(row.projectId)}
+              className="text-sky-700 underline underline-offset-2 hover:text-sky-900"
+            >
+              {label}
+            </button>
+          );
+        },
         description: (row) => (
           <span className="break-words whitespace-normal">
             {row.description?.trim() || "-"}
           </span>
         ),
         progress: (row) => {
-          return progressBadge(row.status);
+          return progressBar(row);
         },
         actions: (row) => (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button
               type="button"
               variant="secondary"

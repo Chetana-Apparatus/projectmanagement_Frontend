@@ -1,5 +1,6 @@
 "use client";
 
+import { Progress } from "antd";
 import { renderAsync } from "docx-preview";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,10 +22,11 @@ export type Project = {
   name: string;
   description: string;
   startDate: string;
-  endDate: string;
+  expectedDate: string;
   documentUrl: string | null;
   documentName: string;
   status: ProjectStatus;
+  progressPercent: number | null;
 };
 
 type ProjectTableProps = {
@@ -33,6 +35,7 @@ type ProjectTableProps = {
   onDelete?: (project: Project) => void;
   allowDelete?: boolean;
   highlightRowId?: string | null;
+  onOpenProject?: (projectId: string) => void;
 };
 
 export default function ProjectTable({
@@ -41,22 +44,37 @@ export default function ProjectTable({
   onDelete,
   allowDelete = true,
   highlightRowId = null,
+  onOpenProject,
 }: ProjectTableProps) {
-  const progressBadge = (status: ProjectStatus) => {
-    const styleMap: Record<ProjectStatus, string> = {
-      Completed: "bg-emerald-100 text-emerald-700",
-      "In Progress": "bg-blue-100 text-blue-700",
-      Paused: "bg-amber-100 text-amber-700",
-      Delayed: "bg-orange-100 text-orange-700",
-      Blocked: "bg-rose-100 text-rose-700",
-      "Not Started": "bg-slate-100 text-slate-700",
-    };
+  const progressColor = (value: number) => {
+    if (value > 75) return "#16a34a";
+    if (value > 50) return "#2563eb";
+    return "#dc2626";
+  };
+
+  const progressBar = (row: Project) => {
+    const fromStatus =
+      row.status === "Completed"
+        ? 100
+        : row.status === "In Progress"
+          ? 75
+          : row.status === "Delayed"
+            ? 50
+            : 25;
+    const percent =
+      typeof row.progressPercent === "number"
+        ? Math.max(0, Math.min(100, Math.round(row.progressPercent)))
+        : fromStatus;
     return (
-      <span
-        className={`rounded-full px-2 py-0.5 text-xs font-medium ${styleMap[status]}`}
-      >
-        {status}
-      </span>
+      <div className="mx-auto w-[160px]">
+        <Progress
+          percent={percent}
+          size="small"
+          strokeColor={progressColor(percent)}
+          trailColor="#e5e7eb"
+          format={(value) => `${value ?? 0}%`}
+        />
+      </div>
     );
   };
 
@@ -142,7 +160,7 @@ export default function ProjectTable({
   const columns: DataTableColumn[] = [
     { label: "Project", key: "name" },
     { label: "Start", key: "startDate" },
-    { label: "End", key: "endDate" },
+    { label: "End", key: "expectedDate" },
     { label: "Document", key: "document" },
     { label: "Progress", key: "progress" },
     { label: "Status", key: "status" },
@@ -159,7 +177,13 @@ export default function ProjectTable({
           name: (row) => (
             <button
               type="button"
-              onClick={() => setPreviewProject(row)}
+              onClick={() => {
+                if (onOpenProject) {
+                  onOpenProject(row.id);
+                  return;
+                }
+                setPreviewProject(row);
+              }}
               className="text-left text-sky-700 underline underline-offset-2 hover:text-sky-900"
             >
               {row.name}
@@ -177,9 +201,7 @@ export default function ProjectTable({
             ) : (
               "-"
             ),
-          progress: (row: Project) => {
-            return progressBadge(row.status);
-          },
+          progress: (row: Project) => progressBar(row),
 
           actions: (row: Project) => (
             <div className="flex items-center justify-end gap-2">

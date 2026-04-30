@@ -2,9 +2,18 @@
 
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Activity, PauseCircle, PlayCircle, Square } from "lucide-react";
+import {
+  Activity,
+  CircleCheck,
+  ListChecks,
+  ListTodo,
+  PauseCircle,
+  PlayCircle,
+  Square,
+} from "lucide-react";
 import { useMemo } from "react";
 import Card from "@/components/common/card/Card";
+import DashboardCard from "@/components/common/dashboard/DashboardCard";
 import StatusBadge from "@/components/common/status/StatusBadge";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
@@ -34,7 +43,7 @@ type DashboardTaskRow = {
   project: string;
   milestone: string;
   startDate: string;
-  endDate: string;
+  expectedDate: string;
   status: ManagedTaskStatus;
 };
 
@@ -98,7 +107,7 @@ export default function EmployeeDashboardPage() {
           project: task.project,
           milestone: task.milestone,
           startDate: task.startDate,
-          endDate: task.deadline,
+          expectedDate: task.deadline,
           status: task.status,
         })),
     [myTasks],
@@ -126,21 +135,25 @@ export default function EmployeeDashboardPage() {
         label: "In Progress",
         value: tasks.filter((task) => task.status === "In Progress").length,
         valueClass: "text-blue-600",
+        icon: ListChecks,
       },
       {
         label: "Paused",
         value: tasks.filter((task) => task.status === "Paused").length,
         valueClass: "text-violet-600",
+        icon: PauseCircle,
       },
       {
         label: "Completed",
         value: completedTasksCount,
         valueClass: "text-emerald-600",
+        icon: CircleCheck,
       },
       {
         label: "Total Tasks",
         value: tasks.length,
         valueClass: "text-cs-primary-100",
+        icon: ListTodo,
       },
     ],
     [tasks, completedTasksCount],
@@ -238,17 +251,13 @@ export default function EmployeeDashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
         {summaryStats.map((stat) => (
-          <Card
+          <DashboardCard
             key={stat.label}
-            className="items-start justify-start rounded-2xl shadow-sm"
-          >
-            <div className="flex w-full items-center justify-between">
-              <p className="text-base font-medium text-cs-text">{stat.label}</p>
-              <p className={`text-3xl font-bold ${stat.valueClass}`}>
-                {stat.value}
-              </p>
-            </div>
-          </Card>
+            title={stat.label}
+            value={stat.value}
+            icon={stat.icon}
+            valueClassName={stat.valueClass}
+          />
         ))}
       </div>
 
