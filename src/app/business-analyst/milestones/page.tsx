@@ -1,7 +1,8 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import MilestoneForm, {
   type MilestoneFormValues,
   type SelectOption,
@@ -11,6 +12,7 @@ import MilestoneTable, {
 } from "@/components/common/milestones/MilestoneTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import {
   type ApiMilestone,
   type ApiProject,
@@ -22,6 +24,7 @@ import {
   drfFormDataPost,
   fetchAllPages,
 } from "@/lib/pms-http";
+import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
 function milestoneFormToFormData(values: MilestoneFormValues): FormData {
   const fd = new FormData();
@@ -33,7 +36,7 @@ function milestoneFormToFormData(values: MilestoneFormValues): FormData {
   return fd;
 }
 
-export default function BAMilestonesPage() {
+function BAMilestonesPageContent() {
   const { showToast } = useToast();
   const [projects, setProjects] = useState<SelectOption[]>([]);
   const [milestones, setMilestones] = useState<MilestoneRecord[]>([]);
@@ -46,6 +49,10 @@ export default function BAMilestonesPage() {
   const [deleteTarget, setDeleteTarget] = useState<MilestoneRecord | null>(
     null,
   );
+
+  const searchParams = useSearchParams();
+  const milestoneIdFromUrl = searchParams.get("milestoneId");
+  const nfFromUrl = searchParams.get(NOTIF_FOCUS_PARAM);
 
   const reload = useCallback(async () => {
     setLoadError(null);
@@ -77,6 +84,23 @@ export default function BAMilestonesPage() {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (!milestoneIdFromUrl) return;
+    if (nfFromUrl === "1") return;
+    const m = milestones.find((row) => row.id === milestoneIdFromUrl);
+    if (m) {
+      setEditingMilestoneId(m.id);
+      setFormMode("edit");
+    }
+  }, [loading, milestones, milestoneIdFromUrl, nfFromUrl]);
+
+  const highlightRowId = useNotificationTableHighlight(
+    loading,
+    "milestoneId",
+    milestones.length,
+  );
+
   const projectNameMap = useMemo(
     () =>
       projects.reduce<Record<string, string>>((acc, project) => {
@@ -107,6 +131,7 @@ export default function BAMilestonesPage() {
   const closeForm = () => {
     setFormMode(null);
     setEditingMilestoneId(null);
+    stripDeepLinkParams(["milestoneId", NOTIF_FOCUS_PARAM]);
   };
 
   const handleCreate = (values: MilestoneFormValues) => {
@@ -187,6 +212,7 @@ export default function BAMilestonesPage() {
       <MilestoneTable
         milestones={milestones}
         projectNameMap={projectNameMap}
+        highlightRowId={highlightRowId}
         onEdit={(milestone) => {
           setEditingMilestoneId(milestone.id);
           setFormMode("edit");
@@ -255,5 +281,13 @@ export default function BAMilestonesPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function BAMilestonesPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-gray-500">Loading…</p>}>
+      <BAMilestonesPageContent />
+    </Suspense>
   );
 }

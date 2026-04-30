@@ -1,8 +1,6 @@
 "use client";
 
-import { User } from "lucide-react";
-import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
@@ -25,7 +23,6 @@ type MeData = {
 
 export default function AccountSettings({ roleLabel }: Props) {
   const USER_NAME_KEY = "userName";
-  const USER_AVATAR_KEY = "userAvatar";
   const { showToast } = useToast();
   const [form, setForm] = useState({
     firstName: "",
@@ -34,15 +31,9 @@ export default function AccountSettings({ roleLabel }: Props) {
     currentPassword: "",
     newPassword: "",
   });
-  const [image, setImage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const storedAvatar = window.localStorage.getItem(USER_AVATAR_KEY);
-    if (storedAvatar) setImage(storedAvatar);
-
     const bootstrap = async () => {
       const stored = getStoredUser();
       if (stored) {
@@ -74,29 +65,6 @@ export default function AccountSettings({ roleLabel }: Props) {
     void bootstrap();
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!validTypes.includes(file.type)) {
-      setError("Only JPG, PNG, WEBP allowed");
-      showToast("Only JPG, PNG, WEBP allowed", "error");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setError("File size must be less than 2MB");
-      showToast("File size must be less than 2MB", "warning");
-      return;
-    }
-    setError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImage(reader.result as string);
-      showToast("Profile photo uploaded successfully", "success");
-    };
-    reader.readAsDataURL(file);
-  };
-
   const applyLocalProfile = (
     firstName: string,
     lastName: string,
@@ -104,11 +72,6 @@ export default function AccountSettings({ roleLabel }: Props) {
   ) => {
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim() || "User";
     window.localStorage.setItem(USER_NAME_KEY, fullName);
-    if (image) {
-      window.localStorage.setItem(USER_AVATAR_KEY, image);
-    } else {
-      window.localStorage.removeItem(USER_AVATAR_KEY);
-    }
 
     const storedRaw = window.localStorage.getItem("pms_user");
     if (storedRaw) {
@@ -194,53 +157,11 @@ export default function AccountSettings({ roleLabel }: Props) {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h3 className="h3">Manage your profile</h3>
+        <h3 className="h3">Account</h3>
+        <p className="ui-caption mt-1 text-cs-text">
+          {roleLabel} — update your name, email, and password.
+        </p>
       </div>
-
-      <Card className="!flex-col !items-start !justify-start p-6">
-        <h2 className="ui-section-title mb-4">Profile</h2>
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-cs-primary-100/30">
-            {image ? (
-              <Image
-                src={image}
-                alt="profile"
-                width={64}
-                height={64}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <User size={24} />
-            )}
-          </div>
-          <div>
-            <p className="ui-card-title">
-              {form.firstName} {form.lastName}
-            </p>
-            <p className="ui-caption">{roleLabel}</p>
-          </div>
-          <div className="ml-auto flex gap-2">
-            <Button onClick={() => fileRef.current?.click()}>Upload</Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setImage(null);
-                showToast("Profile photo removed", "warning");
-              }}
-            >
-              Delete
-            </Button>
-          </div>
-          <input
-            type="file"
-            ref={fileRef}
-            className="hidden"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleFileChange}
-          />
-        </div>
-        {error ? <p className="p1 mt-2 text-red-500">{error}</p> : null}
-      </Card>
 
       <Card className="!flex-col !items-start !justify-start p-6">
         <h2 className="ui-section-title mb-4">General Information</h2>

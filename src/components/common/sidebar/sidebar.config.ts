@@ -30,7 +30,7 @@ export const SIDEBAR_ITEMS: Record<UserRole, SidebarItem[]> = {
     },
     { label: "Milestones", href: "/admin/milestones", icon: Milestone },
     { label: "Tasks", href: "/admin/tasks", icon: CheckSquare },
-    { label: "Work Tracking", href: "/admin/work-tracking", icon: Timer },
+    { label: "Work tracking", href: "/admin/work-tracking", icon: Timer },
     { label: "AI Chat", href: "/admin/ai-chat", icon: MessageSquare },
     { label: "Settings", href: "/admin/settings", icon: Settings },
   ],
@@ -52,7 +52,7 @@ export const SIDEBAR_ITEMS: Record<UserRole, SidebarItem[]> = {
       icon: CheckSquare,
     },
     {
-      label: "Work Tracking",
+      label: "Work tracking",
       href: "/business-analyst/work-tracking",
       icon: Timer,
     },

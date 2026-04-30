@@ -32,6 +32,7 @@ type ProjectTableProps = {
   onEdit: (project: Project) => void;
   onDelete?: (project: Project) => void;
   allowDelete?: boolean;
+  highlightRowId?: string | null;
 };
 
 export default function ProjectTable({
@@ -39,6 +40,7 @@ export default function ProjectTable({
   onEdit,
   onDelete,
   allowDelete = true,
+  highlightRowId = null,
 }: ProjectTableProps) {
   const progressBadge = (status: ProjectStatus) => {
     const styleMap: Record<ProjectStatus, string> = {
@@ -152,6 +154,7 @@ export default function ProjectTable({
       <DataTable<Project>
         columns={columns}
         data={projects}
+        highlightRowId={highlightRowId}
         renderers={{
           name: (row) => (
             <button

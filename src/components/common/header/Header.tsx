@@ -8,6 +8,7 @@ import { useLogout } from "@/hooks/useLogout";
 import type { UserRole } from "@/hooks/useRole";
 import type { NotificationRow } from "@/lib/admin-dashboard-api";
 import { apiFetch } from "@/lib/api-client";
+import { getNotificationHref } from "@/lib/notification-navigation";
 
 type HeaderProps = {
   role: UserRole;
@@ -131,14 +132,15 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
         `/api/v1/notifications/${notificationId}/read/`,
         { method: "PATCH", body: JSON.stringify({}) },
       );
-      if (!res.success) return;
+      if (!res.success) return false;
       setNotifications((prev) =>
         prev.map((n) =>
           n.id === notificationId ? { ...n, is_read: true } : n,
         ),
       );
+      return true;
     } catch {
-      // no-op
+      return false;
     }
   };
 
@@ -198,7 +200,12 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
                       key={n.id}
                       type="button"
                       onClick={() => {
-                        void markNotificationRead(n.id);
+                        void (async () => {
+                          await markNotificationRead(n.id);
+                          setNotificationOpen(false);
+                          const href = getNotificationHref(role, n);
+                          if (href) router.push(href, { scroll: true });
+                        })();
                       }}
                       className="w-full border-b border-border/60 px-3 py-2 text-left hover:bg-cs-primary-100/10"
                     >

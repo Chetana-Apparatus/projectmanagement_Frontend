@@ -43,6 +43,7 @@ function isLoginEnvelopeSuccess(body: unknown): body is LoginEnvelope & {
   );
 }
 
+/** TEMP integration: manual login against local Django while UI ships — remove comment when done. */
 const LoginPage = () => {
   const router = useRouter();
   const { showToast } = useToast();

@@ -11,7 +11,7 @@ import {
   PlayCircle,
   Square,
 } from "lucide-react";
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, Suspense, useState } from "react";
 import Card from "@/components/common/card/Card";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
@@ -19,6 +19,7 @@ import {
   type EmployeeManagedTask,
   statusClassMap,
 } from "@/features/employee-tasks/status";
+import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 
 const singleLineHeaderStyle: CSSProperties = { whiteSpace: "nowrap" };
 const singleLineCellStyle: CSSProperties = {
@@ -28,6 +29,16 @@ const singleLineCellStyle: CSSProperties = {
 };
 
 export default function EmployeeTasksPage() {
+  return (
+    <Suspense
+      fallback={<p className="p-4 text-sm text-gray-500 md:p-6">Loading…</p>}
+    >
+      <EmployeeTasksPageContent />
+    </Suspense>
+  );
+}
+
+function EmployeeTasksPageContent() {
   const {
     loading,
     myTasks,
@@ -47,6 +58,12 @@ export default function EmployeeTasksPage() {
   const [deadlineTaskId, setDeadlineTaskId] = useState<string | null>(null);
   const [requestedDeadline, setRequestedDeadline] = useState("");
   const [deadlineReason, setDeadlineReason] = useState("");
+
+  const highlightRowId = useNotificationTableHighlight(
+    loading,
+    "taskId",
+    myTasks.length,
+  );
 
   const openProjectDocuments = (task: EmployeeManagedTask) => {
     setSelectedProjectName(task.project);
@@ -332,7 +349,11 @@ export default function EmployeeTasksPage() {
             dataSource={myTasks}
             pagination={{ pageSize: 6 }}
             scroll={{ x: 1200 }}
-            rowClassName={() => "hover:bg-gray-50/60"}
+            rowClassName={(record) =>
+              highlightRowId && record.id === highlightRowId
+                ? "!bg-sky-100/90 transition-colors duration-300"
+                : "hover:bg-gray-50/60"
+            }
           />
         </div>
       </Card>

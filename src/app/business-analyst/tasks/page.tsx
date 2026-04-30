@@ -1,13 +1,15 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import TaskForm, {
   type TaskFormValues,
 } from "@/components/common/tasks/TaskForm";
 import TaskTable, { type Task } from "@/components/common/tasks/TaskTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import {
   type ApiMilestone,
   type ApiProject,
@@ -22,8 +24,9 @@ import {
   drfFormDataPost,
   fetchAllPages,
 } from "@/lib/pms-http";
+import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
-export default function BATasksPage() {
+function BATasksPageContent() {
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [open, setOpen] = useState(false);
@@ -40,6 +43,9 @@ export default function BATasksPage() {
   const [employeeNameById, setEmployeeNameById] = useState<
     Record<string, string>
   >({});
+  const searchParams = useSearchParams();
+  const taskIdFromUrl = searchParams.get("taskId");
+  const nfFromUrl = searchParams.get(NOTIF_FOCUS_PARAM);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -88,6 +94,23 @@ export default function BATasksPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (!taskIdFromUrl) return;
+    if (nfFromUrl === "1") return;
+    const task = tasks.find((t) => t.id === taskIdFromUrl);
+    if (task) {
+      setEditing(task);
+      setOpen(true);
+    }
+  }, [loading, tasks, taskIdFromUrl, nfFromUrl]);
+
+  const highlightRowId = useNotificationTableHighlight(
+    loading,
+    "taskId",
+    tasks.length,
+  );
+
   const projectNameById = useMemo(
     () =>
       Object.fromEntries(projects.map((project) => [project.id, project.name])),
@@ -131,6 +154,7 @@ export default function BATasksPage() {
   const closeModal = () => {
     setOpen(false);
     setEditing(null);
+    stripDeepLinkParams(["taskId", NOTIF_FOCUS_PARAM]);
   };
 
   const handleDelete = async (task: Task) => {
@@ -157,7 +181,12 @@ export default function BATasksPage() {
     <div className="space-y-6 p-6">
       <div className="flex justify-between">
         <h1 className="ui-page-title">Tasks</h1>
-        <Button onClick={() => setOpen(true)}>
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setOpen(true);
+          }}
+        >
           <Plus size={16} /> Add Task
         </Button>
       </div>
@@ -170,6 +199,7 @@ export default function BATasksPage() {
         projectHrefMap={projectHrefMap}
         milestoneNameMap={milestoneNameById}
         assignedByNameMap={employeeNameById}
+        highlightRowId={highlightRowId}
         onEdit={(task) => {
           setEditing(task);
           setOpen(true);
@@ -209,5 +239,13 @@ export default function BATasksPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function BATasksPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-gray-500">Loading…</p>}>
+      <BATasksPageContent />
+    </Suspense>
   );
 }
