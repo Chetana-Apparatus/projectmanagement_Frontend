@@ -27,6 +27,7 @@ type TaskTableProps = {
   assignedByNameMap?: Record<string, string>;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  highlightRowId?: string | null;
 };
 
 export default function TaskTable({
@@ -37,6 +38,7 @@ export default function TaskTable({
   assignedByNameMap = {},
   onEdit,
   onDelete,
+  highlightRowId = null,
 }: TaskTableProps) {
   const progressBadge = (status: Task["status"]) => {
     const styleMap: Record<Task["status"], string> = {
@@ -71,6 +73,7 @@ export default function TaskTable({
       columns={columns}
       data={tasks}
       emptyMessage="No tasks found"
+      highlightRowId={highlightRowId}
       renderers={{
         project: (row) => {
           const label = projectNameMap[row.project] ?? row.project;

@@ -1,7 +1,8 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import ProjectForm, {
   type ProjectFormValues,
 } from "@/components/common/projects/ProjectForm";
@@ -10,6 +11,7 @@ import ProjectTable, {
 } from "@/components/common/projects/ProjectTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import { type ApiProject, apiProjectToRow } from "@/lib/admin-mappers";
 import {
   drfDelete,
@@ -17,6 +19,7 @@ import {
   drfFormDataPost,
   fetchAllPages,
 } from "@/lib/pms-http";
+import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
 function buildProjectFormData(values: ProjectFormValues): FormData {
   const fd = new FormData();
@@ -30,7 +33,7 @@ function buildProjectFormData(values: ProjectFormValues): FormData {
   return fd;
 }
 
-export default function ProjectPage() {
+function AdminProjectsPageContent() {
   const { showToast } = useToast();
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -38,6 +41,10 @@ export default function ProjectPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
+
+  const searchParams = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId");
+  const nfFromUrl = searchParams.get(NOTIF_FOCUS_PARAM);
 
   const loadProjects = useCallback(async () => {
     setLoadError(null);
@@ -55,6 +62,23 @@ export default function ProjectPage() {
   useEffect(() => {
     void loadProjects();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!projectIdFromUrl) return;
+    if (nfFromUrl === "1") return;
+    const p = projects.find((row) => row.id === projectIdFromUrl);
+    if (p) {
+      setEditing(p);
+      setOpen(true);
+    }
+  }, [loading, projects, projectIdFromUrl, nfFromUrl]);
+
+  const highlightRowId = useNotificationTableHighlight(
+    loading,
+    "projectId",
+    projects.length,
+  );
 
   useEffect(() => {
     if (!open) return undefined;
@@ -79,8 +103,7 @@ export default function ProjectPage() {
         showToast("Project created", "success");
       }
 
-      setOpen(false);
-      setEditing(null);
+      closeProjectModal();
       await loadProjects();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Save failed", "error");
@@ -96,6 +119,12 @@ export default function ProjectPage() {
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Delete failed", "error");
     }
+  };
+
+  const closeProjectModal = () => {
+    setOpen(false);
+    setEditing(null);
+    stripDeepLinkParams(["projectId", NOTIF_FOCUS_PARAM]);
   };
 
   return (
@@ -117,6 +146,7 @@ export default function ProjectPage() {
 
       <ProjectTable
         projects={projects}
+        highlightRowId={highlightRowId}
         onEdit={(p: Project) => {
           setEditing(p);
           setOpen(true);
@@ -129,10 +159,7 @@ export default function ProjectPage() {
           <button
             type="button"
             className="absolute inset-0"
-            onClick={() => {
-              setOpen(false);
-              setEditing(null);
-            }}
+            onClick={closeProjectModal}
             aria-label="Close modal"
           />
 
@@ -141,10 +168,7 @@ export default function ProjectPage() {
               <Button
                 variant="secondary"
                 size="icon"
-                onClick={() => {
-                  setOpen(false);
-                  setEditing(null);
-                }}
+                onClick={closeProjectModal}
               >
                 <X size={16} />
               </Button>
@@ -163,14 +187,19 @@ export default function ProjectPage() {
                   : undefined
               }
               onSubmit={handleSubmit}
-              onCancel={() => {
-                setOpen(false);
-                setEditing(null);
-              }}
+              onCancel={closeProjectModal}
             />
           </div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function ProjectPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-gray-500">Loading…</p>}>
+      <AdminProjectsPageContent />
+    </Suspense>
   );
 }

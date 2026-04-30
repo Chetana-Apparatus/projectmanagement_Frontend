@@ -19,6 +19,16 @@ type DataTableProps<T extends Record<string, unknown>> = {
   emptyMessage?: string;
   enablePagination?: boolean;
   pageSize?: number;
+  /** Ant Design pagination: allow changing page size (e.g. 10 / 20 / 50). */
+  showPaginationSizeChanger?: boolean;
+  paginationPageSizeOptions?: number[];
+  /** When set, that row gets a light background (notification deep-link). */
+  highlightRowId?: string | null;
+  /**
+   * When `true` (default), pagination is hidden if everything fits one page.
+   * Set `false` to always show the pager (e.g. work tracking).
+   */
+  paginationHideOnSinglePage?: boolean;
 };
 
 export default function DataTable<T extends Record<string, unknown>>({
@@ -29,6 +39,10 @@ export default function DataTable<T extends Record<string, unknown>>({
   emptyMessage = "No data",
   enablePagination = true,
   pageSize = 5,
+  showPaginationSizeChanger = false,
+  paginationPageSizeOptions = [10, 20, 50],
+  highlightRowId = null,
+  paginationHideOnSinglePage = true,
 }: DataTableProps<T>) {
   const tableColumns = useMemo<TableColumnsType<T>>(
     () =>
@@ -57,11 +71,19 @@ export default function DataTable<T extends Record<string, unknown>>({
       enablePagination
         ? {
             pageSize,
-            showSizeChanger: false,
-            hideOnSinglePage: true,
+            showSizeChanger: showPaginationSizeChanger,
+            pageSizeOptions: paginationPageSizeOptions.map(String),
+            hideOnSinglePage: paginationHideOnSinglePage,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
           }
         : false,
-    [enablePagination, pageSize],
+    [
+      enablePagination,
+      pageSize,
+      showPaginationSizeChanger,
+      paginationPageSizeOptions,
+      paginationHideOnSinglePage,
+    ],
   );
 
   return (
@@ -75,6 +97,12 @@ export default function DataTable<T extends Record<string, unknown>>({
         rowKey={(row) =>
           String((row as { id?: string | number }).id ?? JSON.stringify(row))
         }
+        rowClassName={(row) => {
+          const id = String((row as { id?: string | number }).id ?? "");
+          return id && highlightRowId && id === highlightRowId
+            ? "!bg-sky-100/90 transition-colors duration-300"
+            : "";
+        }}
         columns={tableColumns}
         dataSource={data}
         tableLayout="fixed"

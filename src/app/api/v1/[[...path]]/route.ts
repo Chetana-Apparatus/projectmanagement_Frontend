@@ -75,7 +75,7 @@ async function proxy(
     return Response.json(
       {
         success: false,
-        message: `Cannot reach Django at ${origin} (${detail}). Use BACKEND_API_ORIGIN in .env if the API is not on this host (e.g. WSL or Docker).`,
+        message: `Cannot reach Django at ${origin} (${detail}). Set BACKEND_API_ORIGIN in frontend/.env to a URL this PC can open (usually http://127.0.0.1:8000 with runserver), restart next dev, or use a staging URL your network allows.`,
         code: 502,
         data: null,
       },

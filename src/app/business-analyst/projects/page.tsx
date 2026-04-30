@@ -1,7 +1,8 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import ProjectForm, {
   type ProjectFormValues,
 } from "@/components/common/projects/ProjectForm";
@@ -10,6 +11,7 @@ import ProjectTable, {
 } from "@/components/common/projects/ProjectTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import { type ApiProject, apiProjectToRow } from "@/lib/admin-mappers";
 import { apiFetch } from "@/lib/api-client";
 import {
@@ -17,6 +19,7 @@ import {
   drfFormDataPost,
   fetchAllPages,
 } from "@/lib/pms-http";
+import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
 function buildProjectFormData(values: ProjectFormValues): FormData {
   const fd = new FormData();
@@ -28,7 +31,7 @@ function buildProjectFormData(values: ProjectFormValues): FormData {
   return fd;
 }
 
-export default function BAProjectsPage() {
+function BAProjectsPageContent() {
   const { showToast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -45,6 +48,10 @@ export default function BAProjectsPage() {
   const [deadlineReason, setDeadlineReason] = useState("");
   const [submittingDeadlineRequest, setSubmittingDeadlineRequest] =
     useState(false);
+
+  const searchParams = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId");
+  const nfFromUrl = searchParams.get(NOTIF_FOCUS_PARAM);
 
   const loadProjects = useCallback(async () => {
     setLoadError(null);
@@ -64,6 +71,24 @@ export default function BAProjectsPage() {
   }, [loadProjects]);
 
   useEffect(() => {
+    if (loading) return;
+    if (!projectIdFromUrl) return;
+    if (nfFromUrl === "1") return;
+    const p = projects.find((row) => row.id === projectIdFromUrl);
+    if (p) {
+      setEditing(p);
+      setEditingOriginalEndDate(p.endDate);
+      setOpen(true);
+    }
+  }, [loading, projects, projectIdFromUrl, nfFromUrl]);
+
+  const highlightRowId = useNotificationTableHighlight(
+    loading,
+    "projectId",
+    projects.length,
+  );
+
+  useEffect(() => {
     const isModalOpen = open || Boolean(pendingDeadlineRequest);
     if (!isModalOpen) return undefined;
     document.body.style.overflow = "hidden";
@@ -76,6 +101,7 @@ export default function BAProjectsPage() {
     setOpen(false);
     setEditing(null);
     setEditingOriginalEndDate("");
+    stripDeepLinkParams(["projectId", NOTIF_FOCUS_PARAM]);
   };
 
   const submitDeadlineRequest = async () => {
@@ -172,6 +198,7 @@ export default function BAProjectsPage() {
       <ProjectTable
         projects={projects}
         allowDelete={false}
+        highlightRowId={highlightRowId}
         onEdit={(project) => {
           setEditing(project);
           setEditingOriginalEndDate(project.endDate);
@@ -257,5 +284,13 @@ export default function BAProjectsPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function BAProjectsPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-gray-500">Loading…</p>}>
+      <BAProjectsPageContent />
+    </Suspense>
   );
 }

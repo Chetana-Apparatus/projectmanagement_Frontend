@@ -41,25 +41,49 @@ export type AdminDashboardPayload = {
   }>;
 };
 
+export type WorkTrackingHistory = {
+  start_count?: number;
+  pause_count?: number;
+  stop_count?: number;
+  auto_stop_count?: number;
+};
+
+export type WorkTrackingRecord = {
+  employee_id?: number;
+  employee_name: string;
+  employee_email?: string;
+  project_id: number;
+  project_name: string;
+  milestone_id?: number | null;
+  milestone_no?: number | null;
+  milestone_name?: string | null;
+  task_id: number;
+  task_title: string;
+  task_status?: string;
+  timer_state: string;
+  current_session_start_time?: string | null;
+  current_session_seconds?: number;
+  current_session_display?: string;
+  last_session_end_time?: string | null;
+  last_session_start_time?: string | null;
+  last_stop_source?: string | null;
+  today_worked_display?: string;
+  total_time_spent_display?: string;
+  history?: WorkTrackingHistory;
+};
+
 export type WorkTrackingPayload = {
   summary?: {
     records_count?: number;
     started_count?: number;
     paused_count?: number;
     stopped_count?: number;
+    not_started_count?: number;
+    delayed_count?: number;
+    completed_count?: number;
+    auto_stopped_count?: number;
   };
-  work_tracking?: Array<{
-    employee_name: string;
-    task_title: string;
-    project_name: string;
-    milestone_name?: string | null;
-    timer_state: string;
-    task_status?: string;
-    today_worked_display?: string;
-    total_time_spent_display?: string;
-    current_session_start_time?: string | null;
-    current_session_display?: string;
-  }>;
+  work_tracking?: WorkTrackingRecord[];
   recent_activity?: Array<{
     action: "STARTED" | "PAUSED" | "STOPPED" | "COMPLETED";
     employee_name: string;
@@ -109,8 +133,18 @@ export async function fetchBADashboard(): Promise<BADashboardPayload> {
   return res.data;
 }
 
-export async function fetchWorkTracking(): Promise<WorkTrackingPayload> {
-  const res = await apiFetch<WorkTrackingPayload>("/api/v1/work-tracking", {
+export async function fetchWorkTracking(
+  query?: Record<string, string | undefined>,
+): Promise<WorkTrackingPayload> {
+  const sp = new URLSearchParams();
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== "") sp.set(key, value);
+    }
+  }
+  const qs = sp.toString();
+  const path = qs ? `/api/v1/work-tracking?${qs}` : "/api/v1/work-tracking";
+  const res = await apiFetch<WorkTrackingPayload>(path, {
     method: "GET",
   });
   if (!res.success || !res.data) {

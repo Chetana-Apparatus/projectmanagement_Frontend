@@ -1,13 +1,15 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import TaskForm, {
   type TaskFormValues,
 } from "@/components/common/tasks/TaskForm";
 import TaskTable, { type Task } from "@/components/common/tasks/TaskTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
+import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import {
   type ApiMilestone,
   type ApiProject,
@@ -22,8 +24,9 @@ import {
   drfFormDataPost,
   fetchAllPages,
 } from "@/lib/pms-http";
+import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
-export default function TaskPage() {
+function AdminTasksPageContent() {
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [open, setOpen] = useState(false);
@@ -41,6 +44,9 @@ export default function TaskPage() {
     { id: string; name: string }[]
   >([]);
   const [userNameMap, setUserNameMap] = useState<Record<string, string>>({});
+  const searchParams = useSearchParams();
+  const taskIdFromUrl = searchParams.get("taskId");
+  const nfFromUrl = searchParams.get(NOTIF_FOCUS_PARAM);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -96,6 +102,23 @@ export default function TaskPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (!taskIdFromUrl) return;
+    if (nfFromUrl === "1") return;
+    const task = tasks.find((t) => t.id === taskIdFromUrl);
+    if (task) {
+      setEditing(task);
+      setOpen(true);
+    }
+  }, [loading, tasks, taskIdFromUrl, nfFromUrl]);
+
+  const highlightRowId = useNotificationTableHighlight(
+    loading,
+    "taskId",
+    tasks.length,
+  );
+
   const projectNameMap = useMemo(
     () => Object.fromEntries(projectOptions.map((p) => [p.id, p.name])),
     [projectOptions],
@@ -137,6 +160,7 @@ export default function TaskPage() {
   const closeModal = () => {
     setOpen(false);
     setEditing(null);
+    stripDeepLinkParams(["taskId", NOTIF_FOCUS_PARAM]);
   };
 
   const handleEdit = (task: Task) => {
@@ -187,6 +211,7 @@ export default function TaskPage() {
         projectHrefMap={projectHrefMap}
         milestoneNameMap={milestoneNameMap}
         assignedByNameMap={assignedByNameMap}
+        highlightRowId={highlightRowId}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
@@ -221,5 +246,13 @@ export default function TaskPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function TaskPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-gray-500">Loading…</p>}>
+      <AdminTasksPageContent />
+    </Suspense>
   );
 }

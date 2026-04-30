@@ -29,6 +29,7 @@ type MilestoneTableProps = {
   projectNameMap?: Record<string, string>;
   onEdit: (milestone: MilestoneRecord) => void;
   onDelete: (milestone: MilestoneRecord) => void;
+  highlightRowId?: string | null;
 };
 
 export default function MilestoneTable({
@@ -36,6 +37,7 @@ export default function MilestoneTable({
   projectNameMap = {},
   onEdit,
   onDelete,
+  highlightRowId = null,
 }: MilestoneTableProps) {
   const progressBadge = (status: MilestoneRecord["status"]) => {
     const styleMap: Record<MilestoneRecord["status"], string> = {
@@ -70,6 +72,7 @@ export default function MilestoneTable({
       columns={columns}
       data={milestones}
       emptyMessage="No milestones found"
+      highlightRowId={highlightRowId}
       renderers={{
         projectName: (row) => projectNameMap[row.projectId] ?? row.projectId,
         description: (row) => (
