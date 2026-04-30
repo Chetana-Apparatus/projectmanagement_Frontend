@@ -2,7 +2,6 @@
 
 import { Bell, LogOut, Menu, User } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLogout } from "@/hooks/useLogout";
 import type { UserRole } from "@/hooks/useRole";
@@ -21,12 +20,6 @@ const roleLabel: Record<UserRole, string> = {
   Employee: "Employee",
 };
 
-const settingsRouteByRole: Record<UserRole, string> = {
-  admin: "/admin/settings",
-  BA: "/business-analyst",
-  Employee: "/employee/settings",
-};
-
 const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
   const USER_NAME_KEY = "userName";
   const USER_AVATAR_KEY = "userAvatar";
@@ -36,12 +29,10 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
   const [userName, setUserName] = useState("John Doe");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const canManageProfile = role !== "BA";
 
   const menuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const logout = useLogout();
-  const router = useRouter();
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -261,26 +252,12 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
           {/* Dropdown */}
           {open && (
             <div className="absolute right-0 mt-2 w-44 rounded-lg border border-border bg-white p-1 shadow-lg">
-              {canManageProfile ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    router.push(settingsRouteByRole[role]);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-cs-primary-100/10"
-                >
-                  <User size={16} />
-                  Profile
-                </button>
-              ) : null}
-
               <button
                 type="button"
                 onClick={logout}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-500 hover:bg-red-50"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700"
               >
-                <LogOut size={14} />
+                <LogOut size={14} className="text-red-600" />
                 Logout
               </button>
             </div>

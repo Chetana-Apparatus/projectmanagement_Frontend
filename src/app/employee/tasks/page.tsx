@@ -9,10 +9,11 @@ import {
   FileText,
   PauseCircle,
   PlayCircle,
-  Square,
+  StopCircle,
 } from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import Card from "@/components/common/card/Card";
+import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
@@ -27,6 +28,26 @@ const singleLineCellStyle: CSSProperties = {
   textOverflow: "ellipsis",
 };
 
+const isNearDeadline = (deadline: string) => {
+  if (!deadline || deadline === "-") return false;
+  const parsedDeadline = new Date(deadline);
+  if (Number.isNaN(parsedDeadline.getTime())) return false;
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  const startOfDeadline = new Date(
+    parsedDeadline.getFullYear(),
+    parsedDeadline.getMonth(),
+    parsedDeadline.getDate(),
+  );
+  const diffMs = startOfDeadline.getTime() - startOfToday.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= 2;
+};
+
 export default function EmployeeTasksPage() {
   const {
     loading,
@@ -38,8 +59,11 @@ export default function EmployeeTasksPage() {
     requestDeadlineChange,
     canTransition,
   } = useEmployeeTasks();
+  const { showToast } = useToast();
   const [isDocsModalOpen, setIsDocsModalOpen] = useState(false);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
+  const [isSubmittingDeadlineRequest, setIsSubmittingDeadlineRequest] =
+    useState(false);
   const [selectedProjectName, setSelectedProjectName] = useState("");
   const [selectedDocument, setSelectedDocument] = useState<
     EmployeeManagedTask["documents"][number] | null
@@ -67,6 +91,34 @@ export default function EmployeeTasksPage() {
 
   const handleStop = (taskId: string) => {
     stopTask(taskId);
+  };
+
+  const resetDeadlineForm = () => {
+    setRequestedDeadline("");
+    setDeadlineReason("");
+  };
+
+  const handleDeadlineModalClose = () => {
+    setIsDeadlineModalOpen(false);
+    setDeadlineTaskId(null);
+    resetDeadlineForm();
+  };
+
+  const handleDeadlineRequestSubmit = async () => {
+    if (!deadlineTaskId || !requestedDeadline) {
+      showToast("Please select a deadline date", "error");
+      return;
+    }
+    setIsSubmittingDeadlineRequest(true);
+    const isSuccess = await requestDeadlineChange(
+      deadlineTaskId,
+      requestedDeadline,
+      deadlineReason || "Need more time to complete task.",
+    );
+    setIsSubmittingDeadlineRequest(false);
+    if (!isSuccess) return;
+    handleDeadlineModalClose();
+    showToast("Mail sent successfully", "success");
   };
 
   const handleComplete = (
@@ -182,14 +234,12 @@ export default function EmployeeTasksPage() {
         const canStart = canTransition(record.status, "In Progress");
         const canPause = canTransition(record.status, "Paused");
         const canStop = canTransition(record.status, "Stopped");
-        const canComplete =
-          canTransition(record.status, "Completed") ||
-          record.status === "Completed";
+        const canComplete = canTransition(record.status, "Completed");
         const disableAllActions = record.status === "Blocked";
+        const showDeadlineRequest = isNearDeadline(record.deadline);
         const openRequestDeadlineModal = () => {
           setDeadlineTaskId(record.id);
-          setRequestedDeadline("");
-          setDeadlineReason("");
+          resetDeadlineForm();
           setIsDeadlineModalOpen(true);
         };
 
@@ -217,12 +267,12 @@ export default function EmployeeTasksPage() {
           if (record.status === "In Progress") {
             return {
               label: "Stop",
-              icon: <Square className="size-4" />,
+              icon: <StopCircle className="size-4" />,
               onClick: () => handleStop(record.id),
               disabled: disableAllActions || !canStop,
               variant: "ghost" as const,
               className:
-                "h-8 border border-gray-300 bg-transparent px-3 text-xs text-rose-600 hover:border-gray-400 hover:text-rose-700",
+                "h-8 border border-red-300 bg-transparent px-3 text-xs text-red-600 hover:border-red-400 hover:text-red-700",
             };
           }
           return {
@@ -237,7 +287,7 @@ export default function EmployeeTasksPage() {
 
         const secondaryMenuItems = (() => {
           if (record.status === "In Progress") {
-            return [
+            const items = [
               {
                 key: "pause",
                 label: "Pause",
@@ -246,35 +296,80 @@ export default function EmployeeTasksPage() {
                 onClick: () => pauseTask(record.id),
               },
               {
-                key: "deadline",
-                label: "Request Deadline",
+                key: "complete",
+                label: "Complete",
+                icon: <Check className="size-4" />,
                 disabled: disableAllActions,
-                onClick: openRequestDeadlineModal,
+                onClick: () => handleComplete(record.id, record.status),
               },
             ];
+            if (showDeadlineRequest) {
+              items.push({
+                key: "deadline",
+                label: "Request Deadline",
+                icon: <FileText className="size-4" />,
+                disabled: disableAllActions,
+                onClick: openRequestDeadlineModal,
+              });
+            }
+            return items;
           }
           if (record.status === "Paused") {
-            return [
+            const items = [
+              {
+                key: "resume",
+                label: "Resume",
+                icon: <PlayCircle className="size-4" />,
+                disabled: disableAllActions || !canStart,
+                onClick: () => startTask(record.id),
+              },
               {
                 key: "stop",
                 label: "Stop",
-                icon: <Square className="size-4" />,
+                icon: <StopCircle className="size-4" />,
                 disabled: disableAllActions || !canStop,
                 onClick: () => handleStop(record.id),
               },
-              {
+            ];
+            if (showDeadlineRequest) {
+              items.push({
                 key: "deadline",
                 label: "Request Deadline",
+                icon: <FileText className="size-4" />,
                 disabled: disableAllActions,
                 onClick: openRequestDeadlineModal,
+              });
+            }
+            return items;
+          }
+          if (record.status === "Stopped") {
+            const items = [
+              {
+                key: "complete",
+                label: "Complete",
+                icon: <Check className="size-4" />,
+                disabled: disableAllActions || !canComplete,
+                onClick: () => handleComplete(record.id, record.status),
               },
             ];
+            if (showDeadlineRequest) {
+              items.push({
+                key: "deadline",
+                label: "Request Deadline",
+                icon: <FileText className="size-4" />,
+                disabled: disableAllActions,
+                onClick: openRequestDeadlineModal,
+              });
+            }
+            return items;
           }
-          if (record.status === "Not Started" || record.status === "Stopped") {
+          if (record.status === "Not Started") {
+            if (!showDeadlineRequest) return [];
             return [
               {
                 key: "deadline",
                 label: "Request Deadline",
+                icon: <FileText className="size-4" />,
                 disabled: disableAllActions,
                 onClick: openRequestDeadlineModal,
               },
@@ -284,7 +379,7 @@ export default function EmployeeTasksPage() {
         })();
 
         return (
-          <div className="flex flex-nowrap justify-end gap-2">
+          <div className="flex justify-end gap-2">
             <Button
               variant={primaryAction.variant}
               className={primaryAction.className}
@@ -384,18 +479,18 @@ export default function EmployeeTasksPage() {
 
       <Modal
         title="Request Task Deadline Change"
+        centered
         open={isDeadlineModalOpen}
-        onCancel={() => setIsDeadlineModalOpen(false)}
+        onCancel={handleDeadlineModalClose}
         onOk={() => {
-          if (!deadlineTaskId || !requestedDeadline) return;
-          void requestDeadlineChange(
-            deadlineTaskId,
-            requestedDeadline,
-            deadlineReason || "Need more time to complete task.",
-          );
-          setIsDeadlineModalOpen(false);
+          void handleDeadlineRequestSubmit();
         }}
         okText="Send Request"
+        confirmLoading={isSubmittingDeadlineRequest}
+        okButtonProps={{
+          disabled: !requestedDeadline || isSubmittingDeadlineRequest,
+        }}
+        cancelButtonProps={{ disabled: isSubmittingDeadlineRequest }}
       >
         <div className="space-y-3">
           <label className="block text-sm text-cs-heading">

@@ -67,7 +67,7 @@ type EmployeeTasksContextValue = {
     taskId: string,
     newDeadline: string,
     reason: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   refresh: () => Promise<void>;
   canTransition: (
     status: ManagedTaskStatus,
@@ -270,10 +270,10 @@ export function EmployeeTasksProvider({
       );
       if (!res.success) {
         showToast(res.message || "Deadline request failed", "error");
-        return;
+        return false;
       }
-      showToast("Deadline change request sent", "success");
       await refresh();
+      return true;
     },
     [refresh, showToast],
   );

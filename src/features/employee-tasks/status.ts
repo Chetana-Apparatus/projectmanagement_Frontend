@@ -80,10 +80,14 @@ export function transitionTaskStatus<T extends EmployeeManagedTask>(
 
 export function mapApiTaskStatusToManaged(status: string): ManagedTaskStatus {
   switch (status) {
+    case "NOT_STARTED":
+      return "Not Started";
     case "IN_PROGRESS":
       return "In Progress";
     case "PAUSED":
       return "Paused";
+    case "STOPPED":
+      return "Stopped";
     case "COMPLETED":
       return "Completed";
     case "DELAYED":

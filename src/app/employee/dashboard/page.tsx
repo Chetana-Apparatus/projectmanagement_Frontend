@@ -3,7 +3,7 @@
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { Activity, PauseCircle, PlayCircle, Square } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Card from "@/components/common/card/Card";
 import StatusBadge from "@/components/common/status/StatusBadge";
 import Button from "@/components/ui/Button";
@@ -103,28 +103,21 @@ export default function EmployeeDashboardPage() {
         })),
     [myTasks],
   );
-  const [isRunning, setIsRunning] = useState(false);
+  const isRunning = activeTask?.status === "In Progress";
 
-  useEffect(() => {
-    setIsRunning(activeTask?.status === "In Progress");
-  }, [activeTask?.status]);
-
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!activeTask) return;
-    startTask(activeTask.id);
-    setIsRunning(true);
+    await startTask(activeTask.id);
   };
 
-  const handlePause = () => {
+  const handlePause = async () => {
     if (!activeTask) return;
-    pauseTask(activeTask.id);
-    setIsRunning(false);
+    await pauseTask(activeTask.id);
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     if (!activeTask) return;
-    stopTask(activeTask.id);
-    setIsRunning(false);
+    await stopTask(activeTask.id);
   };
 
   const summaryStats = useMemo(
