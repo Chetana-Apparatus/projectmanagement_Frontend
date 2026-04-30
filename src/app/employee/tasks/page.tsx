@@ -1,8 +1,10 @@
 "use client";
 
-import { Modal, Table } from "antd";
+import { Dropdown, Modal, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
+  Check,
+  ChevronDown,
   Download,
   FileText,
   PauseCircle,
@@ -92,6 +94,7 @@ export default function EmployeeTasksPage() {
       title: "Project Name",
       key: "project",
       width: 190,
+      align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
       render: (_, record) =>
@@ -116,6 +119,7 @@ export default function EmployeeTasksPage() {
       dataIndex: "milestone",
       key: "milestone",
       width: 170,
+      align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
       render: (value: string) => (
@@ -129,6 +133,7 @@ export default function EmployeeTasksPage() {
       dataIndex: "task",
       key: "task",
       width: 260,
+      align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
       render: (value: string) => (
@@ -141,6 +146,7 @@ export default function EmployeeTasksPage() {
       title: "Status",
       key: "status",
       width: 150,
+      align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
       render: (_, record) => (
@@ -155,6 +161,7 @@ export default function EmployeeTasksPage() {
       title: "Assigned By",
       dataIndex: "assignedBy",
       key: "assignedBy",
+      align: "center",
       width: 140,
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
@@ -167,8 +174,8 @@ export default function EmployeeTasksPage() {
     {
       title: "Action",
       key: "action",
-      align: "right",
       width: 320,
+      align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
       render: (_, record) => {
@@ -179,56 +186,128 @@ export default function EmployeeTasksPage() {
           canTransition(record.status, "Completed") ||
           record.status === "Completed";
         const disableAllActions = record.status === "Blocked";
+        const openRequestDeadlineModal = () => {
+          setDeadlineTaskId(record.id);
+          setRequestedDeadline("");
+          setDeadlineReason("");
+          setIsDeadlineModalOpen(true);
+        };
+
+        const primaryAction = (() => {
+          if (record.status === "Completed") {
+            return {
+              label: "Completed",
+              icon: <Check className="size-4" />,
+              onClick: () => {},
+              disabled: true,
+              variant: "secondary" as const,
+              className: "h-8 px-3 text-xs",
+            };
+          }
+          if (record.status === "Stopped") {
+            return {
+              label: "Complete",
+              icon: <Check className="size-4" />,
+              onClick: () => handleComplete(record.id, record.status),
+              disabled: disableAllActions || !canComplete,
+              variant: "secondary" as const,
+              className: "h-8 px-3 text-xs",
+            };
+          }
+          if (record.status === "In Progress") {
+            return {
+              label: "Stop",
+              icon: <Square className="size-4" />,
+              onClick: () => handleStop(record.id),
+              disabled: disableAllActions || !canStop,
+              variant: "ghost" as const,
+              className:
+                "h-8 border border-gray-300 bg-transparent px-3 text-xs text-rose-600 hover:border-gray-400 hover:text-rose-700",
+            };
+          }
+          return {
+            label: "Start",
+            icon: <PlayCircle className="size-4" />,
+            onClick: () => startTask(record.id),
+            disabled: disableAllActions || !canStart,
+            variant: "default" as const,
+            className: "h-8 px-3 text-xs",
+          };
+        })();
+
+        const secondaryMenuItems = (() => {
+          if (record.status === "In Progress") {
+            return [
+              {
+                key: "pause",
+                label: "Pause",
+                icon: <PauseCircle className="size-4" />,
+                disabled: disableAllActions || !canPause,
+                onClick: () => pauseTask(record.id),
+              },
+              {
+                key: "deadline",
+                label: "Request Deadline",
+                disabled: disableAllActions,
+                onClick: openRequestDeadlineModal,
+              },
+            ];
+          }
+          if (record.status === "Paused") {
+            return [
+              {
+                key: "stop",
+                label: "Stop",
+                icon: <Square className="size-4" />,
+                disabled: disableAllActions || !canStop,
+                onClick: () => handleStop(record.id),
+              },
+              {
+                key: "deadline",
+                label: "Request Deadline",
+                disabled: disableAllActions,
+                onClick: openRequestDeadlineModal,
+              },
+            ];
+          }
+          if (record.status === "Not Started" || record.status === "Stopped") {
+            return [
+              {
+                key: "deadline",
+                label: "Request Deadline",
+                disabled: disableAllActions,
+                onClick: openRequestDeadlineModal,
+              },
+            ];
+          }
+          return [];
+        })();
 
         return (
           <div className="flex flex-nowrap justify-end gap-2">
             <Button
-              className="h-8 px-3 text-xs"
-              disabled={disableAllActions || !canStart}
-              onClick={() => startTask(record.id)}
+              variant={primaryAction.variant}
+              className={primaryAction.className}
+              disabled={primaryAction.disabled}
+              onClick={primaryAction.onClick}
             >
-              <PlayCircle className="size-4" />
-              Start
+              {primaryAction.icon}
+              {primaryAction.label}
             </Button>
-            <Button
-              variant="secondary"
-              className="h-8 px-3 text-xs"
-              disabled={disableAllActions || !canPause}
-              onClick={() => pauseTask(record.id)}
+            <Dropdown
+              trigger={["click"]}
+              menu={{ items: secondaryMenuItems }}
+              disabled={secondaryMenuItems.length === 0}
             >
-              <PauseCircle className="size-4" />
-              Pause
-            </Button>
-            <Button
-              variant="ghost"
-              className="h-8 border border-gray-300 bg-transparent px-3 text-xs text-rose-600 hover:border-gray-400 hover:text-rose-700"
-              disabled={disableAllActions || !canStop}
-              onClick={() => handleStop(record.id)}
-            >
-              <Square className="size-4" />
-              Stop
-            </Button>
-            <Button
-              variant="secondary"
-              className="h-8 px-3 text-xs"
-              disabled={disableAllActions || !canComplete}
-              onClick={() => handleComplete(record.id, record.status)}
-            >
-              Complete
-            </Button>
-            <Button
-              variant="secondary"
-              className="h-8 px-3 text-xs"
-              disabled={disableAllActions || record.status === "Completed"}
-              onClick={() => {
-                setDeadlineTaskId(record.id);
-                setRequestedDeadline("");
-                setDeadlineReason("");
-                setIsDeadlineModalOpen(true);
-              }}
-            >
-              Request Deadline
-            </Button>
+              <Button
+                variant="secondary"
+                className="h-8 px-3 text-xs"
+                disabled={secondaryMenuItems.length === 0}
+              >
+                More
+                <ChevronDown className="size-4" />
+              </Button>
+            </Dropdown>
           </div>
         );
       },

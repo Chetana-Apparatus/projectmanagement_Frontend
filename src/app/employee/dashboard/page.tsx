@@ -3,7 +3,7 @@
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { Activity, PauseCircle, PlayCircle, Square } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Card from "@/components/common/card/Card";
 import StatusBadge from "@/components/common/status/StatusBadge";
 import Button from "@/components/ui/Button";
@@ -43,20 +43,24 @@ const columns: ColumnsType<DashboardTaskRow> = [
     title: "Task Name",
     dataIndex: "taskName",
     key: "taskName",
+    align: "center",
   },
   {
     title: "Project",
     dataIndex: "project",
     key: "project",
+    align: "center",
   },
   {
     title: "Milestone",
     dataIndex: "milestone",
     key: "milestone",
+    align: "center",
   },
   {
     title: "Status",
     key: "status",
+    align: "center",
     render: (_, record) => (
       <StatusBadge variant={getStatusVariant(record.status)}>
         {record.status}
@@ -99,29 +103,32 @@ export default function EmployeeDashboardPage() {
         })),
     [myTasks],
   );
+  const [isRunning, setIsRunning] = useState(false);
+
+  useEffect(() => {
+    setIsRunning(activeTask?.status === "In Progress");
+  }, [activeTask?.status]);
 
   const handleStart = () => {
     if (!activeTask) return;
     startTask(activeTask.id);
+    setIsRunning(true);
   };
 
   const handlePause = () => {
     if (!activeTask) return;
     pauseTask(activeTask.id);
+    setIsRunning(false);
   };
 
   const handleStop = () => {
     if (!activeTask) return;
     stopTask(activeTask.id);
+    setIsRunning(false);
   };
 
   const summaryStats = useMemo(
     () => [
-      {
-        label: "Not Started",
-        value: tasks.filter((task) => task.status === "Not Started").length,
-        valueClass: "text-gray-600",
-      },
       {
         label: "In Progress",
         value: tasks.filter((task) => task.status === "In Progress").length,
@@ -175,62 +182,75 @@ export default function EmployeeDashboardPage() {
               </StatusBadge>
             ) : null}
           </div>
-          <div className="grid gap-3 text-sm text-cs-text md:grid-cols-2">
-            <p className="p1">
-              <span className="p1 text-cs-heading">Project:</span>{" "}
-              {activeTask?.project ?? "No active task"}
+          <div className="flex flex-col gap-2 text-left">
+            <p className="text-base text-cs-text">
+              <span className="mr-1 font-medium text-cs-heading">Project:</span>
+              <span className="font-semibold">
+                {activeTask?.project ?? "No active task"}
+              </span>
             </p>
-            <p className="p1">
-              <span className="p1 text-cs-heading">Milestone:</span>{" "}
-              {activeTask?.milestone ?? "-"}
+            <p className="text-base text-cs-text">
+              <span className="mr-1 font-medium text-cs-heading">
+                Milestone:
+              </span>
+              <span className="font-semibold">
+                {activeTask?.milestone ?? "-"}
+              </span>
             </p>
-            <p className="md:col-span-2 p1">
-              <span className="p1 font-medium text-cs-heading">Task:</span>{" "}
-              {activeTask?.task ?? "No active task"}
+            <p className="text-base text-cs-text">
+              <span className="mr-1 font-medium text-cs-heading">Task:</span>
+              <span className="font-semibold">
+                {activeTask?.task ?? "No active task"}
+              </span>
             </p>
           </div>
           {loading ? (
             <p className="p1 text-cs-text">Loading employee dashboard…</p>
           ) : null}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              className="h-8 px-3 text-xs"
-              disabled={disableAllActions || !canStart}
-              onClick={handleStart}
-            >
-              <PlayCircle className="size-4" />
-              Start
-            </Button>
-            <Button
-              variant="secondary"
-              className="h-8 px-3 text-xs"
-              disabled={disableAllActions || !canPause}
-              onClick={handlePause}
-            >
-              <PauseCircle className="size-4" />
-              Pause
-            </Button>
-            <Button
-              variant="ghost"
-              className="h-8 border border-gray-300 bg-transparent px-3 text-xs text-rose-600 hover:border-gray-400 hover:text-rose-700"
-              disabled={disableAllActions || !canStop}
-              onClick={handleStop}
-            >
-              <Square className="size-4" />
-              Stop
-            </Button>
+          <div className="flex w-full justify-end items-center gap-3">
+            {!isRunning ? (
+              <Button
+                className="h-9 px-4 text-sm"
+                disabled={disableAllActions || !canStart}
+                onClick={handleStart}
+              >
+                <PlayCircle className="size-4" />
+                Start
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  className="h-9 border border-rose-300 bg-transparent px-4 text-sm text-rose-600 hover:border-rose-400 hover:text-rose-700"
+                  disabled={disableAllActions || !canStop}
+                  onClick={handleStop}
+                >
+                  <Square className="size-4" />
+                  Stop
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="h-9 px-4 text-sm"
+                  disabled={disableAllActions || !canPause || !isRunning}
+                  onClick={handlePause}
+                >
+                  <PauseCircle className="size-4" />
+                  Pause
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
         {summaryStats.map((stat) => (
           <Card
             key={stat.label}
             className="items-start justify-start rounded-2xl shadow-sm"
           >
             <div className="flex w-full items-center justify-between">
-              <p className="p1 text-cs-text">{stat.label}</p>
+              <p className="text-base font-medium text-cs-text">{stat.label}</p>
               <p className={`text-3xl font-bold ${stat.valueClass}`}>
                 {stat.value}
               </p>
@@ -254,7 +274,7 @@ export default function EmployeeDashboardPage() {
       <Card className="items-start justify-start rounded-2xl shadow-sm">
         <div className="w-full space-y-4">
           <h2 className="h2 text-cs-heading">Recent Activity</h2>
-          <div className="space-y-3">
+          <div className="max-h-72 space-y-3 overflow-y-auto pr-1 scroll-smooth">
             {recentActivity.map((item) => (
               <div
                 key={item.id}

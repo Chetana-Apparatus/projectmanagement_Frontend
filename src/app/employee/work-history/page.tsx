@@ -10,12 +10,23 @@ import {
 } from "@/features/employee-tasks/status";
 
 const columns: ColumnsType<EmployeeManagedTask> = [
-  { title: "Project Name", dataIndex: "project", key: "project" },
-  { title: "Milestone", dataIndex: "milestone", key: "milestone" },
-  { title: "Task Name", dataIndex: "task", key: "task" },
+  {
+    title: "Project Name",
+    dataIndex: "project",
+    key: "project",
+    align: "center",
+  },
+  {
+    title: "Milestone",
+    dataIndex: "milestone",
+    key: "milestone",
+    align: "center",
+  },
+  { title: "Task Name", dataIndex: "task", key: "task", align: "center" },
   {
     title: "Status",
     key: "status",
+    align: "center",
     render: (_, record) => (
       <span
         className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${statusClassMap[record.status]}`}
@@ -24,8 +35,18 @@ const columns: ColumnsType<EmployeeManagedTask> = [
       </span>
     ),
   },
-  { title: "Deadline", dataIndex: "deadline", key: "deadline" },
-  { title: "Assigned By", dataIndex: "assignedBy", key: "assignedBy" },
+  {
+    title: "Deadline",
+    dataIndex: "deadline",
+    key: "deadline",
+    align: "center",
+  },
+  {
+    title: "Assigned By",
+    dataIndex: "assignedBy",
+    key: "assignedBy",
+    align: "center",
+  },
 ];
 
 export default function EmployeeWorkHistoryPage() {
@@ -44,7 +65,7 @@ export default function EmployeeWorkHistoryPage() {
             rowKey="id"
             columns={columns}
             dataSource={historyTasks}
-            pagination={{ pageSize: 6 }}
+            pagination={{ pageSize: 8 }}
             scroll={{ x: 900 }}
           />
         </div>
