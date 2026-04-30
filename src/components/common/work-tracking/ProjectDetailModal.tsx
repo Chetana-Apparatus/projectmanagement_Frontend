@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal, Table } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { ApiMilestone, ApiProject, ApiTask } from "@/lib/admin-mappers";
 import { getPublicApiOrigin } from "@/lib/api-base";
 import {
@@ -75,6 +75,19 @@ async function loadProject(id: number): Promise<ApiProject> {
   }
 }
 
+function truncateDesc(text: string | null | undefined): ReactNode {
+  const s = (text ?? "").trim();
+  if (!s) return <span className="text-gray-400">—</span>;
+  return (
+    <span
+      className="line-clamp-2 block max-w-[min(280px,28vw)] whitespace-pre-wrap break-words text-sm text-gray-700"
+      title={s}
+    >
+      {s}
+    </span>
+  );
+}
+
 function documentHref(documentPath: string): string {
   if (!documentPath) return "";
   if (/^https?:\/\//i.test(documentPath)) return documentPath;
@@ -140,7 +153,15 @@ export default function ProjectDetailModal({
         width: 56,
         render: (n: number | undefined) => n ?? "—",
       },
-      { title: "Name", dataIndex: "name", key: "name" },
+      { title: "Name", dataIndex: "name", key: "name", width: 140 },
+      {
+        title: "Description",
+        dataIndex: "description",
+        key: "description",
+        ellipsis: true,
+        render: (_: unknown, row: ApiMilestone) =>
+          truncateDesc(row.description),
+      },
       {
         title: "Start",
         dataIndex: "start_date",
@@ -166,7 +187,19 @@ export default function ProjectDetailModal({
 
   const taskColumns = useMemo(
     () => [
-      { title: "Task", dataIndex: "title", key: "title" },
+      {
+        title: "Task",
+        dataIndex: "title",
+        key: "title",
+        width: 160,
+        ellipsis: true,
+      },
+      {
+        title: "Description",
+        dataIndex: "description",
+        key: "description",
+        render: (_: unknown, row: ApiTask) => truncateDesc(row.description),
+      },
       {
         title: "Status",
         dataIndex: "status",
@@ -263,6 +296,7 @@ export default function ProjectDetailModal({
             </h3>
             <Table<ApiMilestone>
               size="small"
+              scroll={{ x: 720 }}
               pagination={milestones.length > 8 ? { pageSize: 8 } : false}
               rowKey="id"
               dataSource={[...milestones].sort(
@@ -279,6 +313,7 @@ export default function ProjectDetailModal({
             </h3>
             <Table<ApiTask>
               size="small"
+              scroll={{ x: 800 }}
               pagination={tasks.length > 8 ? { pageSize: 8 } : false}
               rowKey="id"
               dataSource={tasks}

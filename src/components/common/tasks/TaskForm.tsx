@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
 import type { Task } from "@/components/common/tasks/TaskTable";
@@ -12,6 +13,7 @@ const statuses = [
   "Paused",
   "Stopped",
   "Completed",
+  "Delayed",
 ] as const;
 
 type EmployeeOption = {
@@ -19,19 +21,24 @@ type EmployeeOption = {
   name: string;
 };
 
-type ProjectOption = {
+export type ProjectOption = {
   id: string;
   name: string;
+  /** YYYY-MM-DD from API */
+  deadline?: string;
 };
 
-type MilestoneOption = {
+export type MilestoneOption = {
   id: string;
   name: string;
   projectId: string;
+  /** YYYY-MM-DD from API */
+  endDate?: string;
 };
 
 export type TaskFormValues = {
   name: string;
+  description: string;
   project: string;
   milestone: string;
   assignedBy: string;
@@ -46,12 +53,14 @@ type TaskFormProps = {
   projects?: ProjectOption[];
   milestones?: MilestoneOption[];
   showAssignedBy?: boolean;
+  submitting?: boolean;
   onSubmit: (values: TaskFormValues) => void;
   onCancel: () => void;
 };
 
 const emptyForm: TaskFormValues = {
   name: "",
+  description: "",
   project: "",
   milestone: "",
   assignedBy: "",
@@ -60,12 +69,19 @@ const emptyForm: TaskFormValues = {
   status: "Not Started",
 };
 
+function ymdKey(s: string): string | null {
+  const t = s.trim();
+  if (!t) return null;
+  return t.split("T")[0];
+}
+
 export default function TaskForm({
   initial,
   employees = [],
   projects = [],
   milestones = [],
   showAssignedBy = false,
+  submitting = false,
   onSubmit,
   onCancel,
 }: TaskFormProps) {
@@ -73,57 +89,95 @@ export default function TaskForm({
     initial
       ? {
           name: initial.name,
+          description: initial.description ?? "",
           project: initial.project,
           milestone: initial.milestone,
           assignedBy: initial.assignedBy,
           startDate: initial.startDate,
-          endDate: initial.endDate,
+          endDate: initial.endDate ? initial.endDate.split("T")[0] : "",
           status: initial.status,
         }
       : emptyForm,
   );
+  const [dateError, setDateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initial) {
       setForm({
         name: initial.name,
+        description: initial.description ?? "",
         project: initial.project,
         milestone: initial.milestone,
         assignedBy: initial.assignedBy,
         startDate: initial.startDate,
-        endDate: initial.endDate,
+        endDate: initial.endDate ? initial.endDate.split("T")[0] : "",
         status: initial.status,
       });
       return;
     }
     setForm(emptyForm);
+    setDateError(null);
   }, [initial]);
 
   const availableMilestones = form.project
     ? milestones.filter((milestone) => milestone.projectId === form.project)
     : milestones;
 
+  const selectedProject = projects.find((p) => p.id === form.project);
+  const selectedMilestone = milestones.find((m) => m.id === form.milestone);
+
+  const validateExpectedDate = (
+    endDate: string,
+    projectId: string,
+    milestoneId: string,
+  ): string | null => {
+    const exp = ymdKey(endDate);
+    if (!exp) return null;
+    const proj = projects.find((p) => p.id === projectId);
+    const projCap = proj?.deadline ? ymdKey(proj.deadline) : null;
+    const ms = milestones.find((m) => m.id === milestoneId);
+    const msCap = ms?.endDate ? ymdKey(ms.endDate) : null;
+    if (projCap && exp > projCap) {
+      return `Expected date cannot be after the project deadline (${projCap}).`;
+    }
+    if (msCap && exp > msCap) {
+      return `Expected date cannot be after the milestone end date (${msCap}).`;
+    }
+    return null;
+  };
+
   return (
-    <Card className="w-full !flex-col !items-start !justify-start p-6">
+    <Card className="w-full !flex-col !items-start !justify-start p-6 font-sans">
       <form
         className="w-full space-y-5"
         onSubmit={(event) => {
           event.preventDefault();
+          if (submitting) return;
+          const err = validateExpectedDate(
+            form.endDate,
+            form.project,
+            form.milestone,
+          );
+          if (err) {
+            setDateError(err);
+            return;
+          }
+          setDateError(null);
           onSubmit(form);
         }}
       >
-        {/* HEADER */}
         <div className="w-full text-center">
-          <h2 className="text-lg font-semibold">
+          <p className="font-sans text-lg font-semibold text-gray-900">
             {initial ? "Edit Task" : "Add Task"}
-          </h2>
+          </p>
         </div>
 
-        {/* FORM */}
         <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
-          {/* TASK NAME */}
           <div className="space-y-1.5 md:col-span-2">
-            <label htmlFor="task-name" className="text-sm font-medium">
+            <label
+              htmlFor="task-name"
+              className="text-sm font-medium text-gray-700"
+            >
               Task Name
             </label>
             <Input
@@ -131,25 +185,48 @@ export default function TaskForm({
               placeholder="Enter task name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
             />
           </div>
 
-          {/* PROJECT */}
+          <div className="space-y-1.5 md:col-span-2">
+            <label
+              htmlFor="task-description"
+              className="text-sm font-medium text-gray-700"
+            >
+              Description
+            </label>
+            <textarea
+              id="task-description"
+              className="ui-textarea"
+              placeholder="Describe the task…"
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              rows={4}
+            />
+          </div>
+
           <div className="space-y-1.5">
-            <label htmlFor="task-project" className="text-sm font-medium">
+            <label
+              htmlFor="task-project"
+              className="text-sm font-medium text-gray-700"
+            >
               Project
             </label>
             <select
               id="task-project"
-              className="h-10 w-full rounded-md border px-3 text-sm"
+              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
               value={form.project}
-              onChange={(e) =>
+              onChange={(e) => {
                 setForm({
                   ...form,
                   project: e.target.value,
                   milestone: "",
-                })
-              }
+                });
+                setDateError(null);
+              }}
               required
             >
               <option value="">Select project</option>
@@ -161,16 +238,21 @@ export default function TaskForm({
             </select>
           </div>
 
-          {/* MILESTONE */}
           <div className="space-y-1.5">
-            <label htmlFor="task-milestone" className="text-sm font-medium">
+            <label
+              htmlFor="task-milestone"
+              className="text-sm font-medium text-gray-700"
+            >
               Milestone
             </label>
             <select
               id="task-milestone"
-              className="h-10 w-full rounded-md border px-3 text-sm"
+              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
               value={form.milestone}
-              onChange={(e) => setForm({ ...form, milestone: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, milestone: e.target.value });
+                setDateError(null);
+              }}
               required
               disabled={!form.project}
             >
@@ -187,12 +269,15 @@ export default function TaskForm({
 
           {showAssignedBy && (
             <div className="space-y-1.5 md:col-span-2">
-              <label htmlFor="task-assigned-by" className="text-sm font-medium">
+              <label
+                htmlFor="task-assigned-by"
+                className="text-sm font-medium text-gray-700"
+              >
                 Assigned By
               </label>
               <select
                 id="task-assigned-by"
-                className="h-10 w-full rounded-md border px-3 text-sm"
+                className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
                 value={form.assignedBy}
                 onChange={(e) =>
                   setForm({
@@ -212,9 +297,11 @@ export default function TaskForm({
             </div>
           )}
 
-          {/* START DATE */}
           <div className="space-y-1.5">
-            <label htmlFor="task-start-date" className="text-sm font-medium">
+            <label
+              htmlFor="task-start-date"
+              className="text-sm font-medium text-gray-700"
+            >
               Start Date
             </label>
             <Input
@@ -225,27 +312,51 @@ export default function TaskForm({
             />
           </div>
 
-          {/* END DATE */}
           <div className="space-y-1.5">
-            <label htmlFor="task-end-date" className="text-sm font-medium">
-              End Date
+            <label
+              htmlFor="task-expected-date"
+              className="text-sm font-medium text-gray-700"
+            >
+              Expected date
             </label>
             <Input
-              id="task-end-date"
+              id="task-expected-date"
               type="date"
+              max={
+                [selectedMilestone?.endDate, selectedProject?.deadline]
+                  .filter(Boolean)
+                  .sort()
+                  .at(0) ?? undefined
+              }
               value={form.endDate}
-              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, endDate: e.target.value });
+                setDateError(null);
+              }}
             />
+            {selectedProject?.deadline ? (
+              <p className="ui-caption text-muted-foreground">
+                Project deadline: {ymdKey(selectedProject.deadline)}
+                {selectedMilestone?.endDate
+                  ? ` · Milestone end: ${ymdKey(selectedMilestone.endDate)}`
+                  : null}
+              </p>
+            ) : null}
+            {dateError ? (
+              <p className="ui-caption text-red-600">{dateError}</p>
+            ) : null}
           </div>
 
-          {/* STATUS */}
           <div className="space-y-1.5 md:col-span-2">
-            <label htmlFor="task-status" className="text-sm font-medium">
+            <label
+              htmlFor="task-status"
+              className="text-sm font-medium text-gray-700"
+            >
               Status
             </label>
             <select
               id="task-status"
-              className="h-10 w-full rounded-md border px-3 text-sm"
+              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
               value={form.status}
               onChange={(e) =>
                 setForm({
@@ -255,18 +366,33 @@ export default function TaskForm({
               }
             >
               {statuses.map((s) => (
-                <option key={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* ACTIONS */}
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button type="button" variant="secondary" onClick={onCancel}>
+        <div className="flex justify-end gap-2 border-t border-cs-border pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={submitting}
+          >
             Cancel
           </Button>
-          <Button type="submit">Save</Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 className="animate-spin" aria-hidden />
+                Saving…
+              </>
+            ) : (
+              "Save"
+            )}
+          </Button>
         </div>
       </form>
     </Card>
