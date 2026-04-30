@@ -135,11 +135,7 @@ export function EmployeeTasksProvider({
       if (!latestAction) return task;
       // Backend maps stop action to PAUSED status. Only reinterpret PAUSED
       // as STOPPED when latest activity confirms a stop event.
-      if (
-        latestAction === "STOPPED" &&
-        task.status === "Paused" &&
-        task.status !== "Completed"
-      ) {
+      if (latestAction === "STOPPED" && task.status === "Paused") {
         return { ...task, status: "Stopped" };
       }
       if (
