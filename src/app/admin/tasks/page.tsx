@@ -8,6 +8,7 @@ import TaskForm, {
 } from "@/components/common/tasks/TaskForm";
 import TaskTable, { type Task } from "@/components/common/tasks/TaskTable";
 import { useToast } from "@/components/common/toast/ToastProvider";
+import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import {
@@ -33,12 +34,20 @@ function AdminTasksPageContent() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
+  const [projectModalId, setProjectModalId] = useState<number | null>(null);
+  const [projectFilter, setProjectFilter] = useState("");
+  const [milestoneFilter, setMilestoneFilter] = useState("");
+  const [taskFilter, setTaskFilter] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [progressFilter, setProgressFilter] = useState("");
 
   const [projectOptions, setProjectOptions] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; deadline: string }[]
   >([]);
   const [milestoneOptions, setMilestoneOptions] = useState<
-    { id: string; name: string; projectId: string }[]
+    { id: string; name: string; projectId: string; endDate: string }[]
   >([]);
   const [employeeOptions, setEmployeeOptions] = useState<
     { id: string; name: string }[]
@@ -79,7 +88,11 @@ function AdminTasksPageContent() {
       );
 
       setProjectOptions(
-        projectRows.map((p) => ({ id: String(p.id), name: p.name })),
+        projectRows.map((p) => ({
+          id: String(p.id),
+          name: p.name,
+          deadline: p.deadline ? p.deadline.split("T")[0] : "",
+        })),
       );
 
       setMilestoneOptions(
@@ -87,6 +100,7 @@ function AdminTasksPageContent() {
           id: String(m.id),
           name: m.name,
           projectId: String(m.project),
+          endDate: m.end_date ? m.end_date.split("T")[0] : "",
         })),
       );
 
@@ -123,23 +137,74 @@ function AdminTasksPageContent() {
     () => Object.fromEntries(projectOptions.map((p) => [p.id, p.name])),
     [projectOptions],
   );
-  const projectHrefMap = useMemo(
-    () =>
-      Object.fromEntries(
-        projectOptions.map((p) => [p.id, `/admin/projects/${p.id}`]),
-      ),
-    [projectOptions],
-  );
 
   const milestoneNameMap = useMemo(
     () => Object.fromEntries(milestoneOptions.map((m) => [m.id, m.name])),
     [milestoneOptions],
   );
 
-  /** Maps created_by ids to labels */
   const assignedByNameMap = userNameMap;
+  const employeeNameById = useMemo(
+    () => Object.fromEntries(employeeOptions.map((e) => [e.id, e.name])),
+    [employeeOptions],
+  );
+
+  const filteredMilestoneOptions = useMemo(
+    () =>
+      projectFilter
+        ? milestoneOptions.filter((m) => m.projectId === projectFilter)
+        : milestoneOptions,
+    [milestoneOptions, projectFilter],
+  );
+
+  const progressOptions = useMemo(
+    () =>
+      Array.from(new Set(tasks.map((t) => t.progress))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [tasks],
+  );
+
+  const taskFilterOptions = useMemo(() => {
+    let list = tasks;
+    if (projectFilter) list = list.filter((t) => t.project === projectFilter);
+    if (milestoneFilter)
+      list = list.filter((t) => t.milestone === milestoneFilter);
+    return list;
+  }, [tasks, projectFilter, milestoneFilter]);
+
+  const filteredTasks = useMemo(
+    () =>
+      tasks.filter((task) => {
+        if (projectFilter && task.project !== projectFilter) return false;
+        if (milestoneFilter && task.milestone !== milestoneFilter) return false;
+        if (taskFilter && task.id !== taskFilter) return false;
+        const taskEmployee =
+          task.employee || employeeNameById[task.assignedBy] || "";
+        if (
+          employeeFilter &&
+          taskEmployee.trim().toLowerCase() !==
+            employeeFilter.trim().toLowerCase()
+        ) {
+          return false;
+        }
+        if (progressFilter && task.progress !== progressFilter) return false;
+        return true;
+      }),
+    [
+      tasks,
+      projectFilter,
+      milestoneFilter,
+      taskFilter,
+      employeeFilter,
+      progressFilter,
+      employeeNameById,
+    ],
+  );
 
   const handleSubmit = async (data: TaskFormValues) => {
+    if (saving) return;
+    setSaving(true);
     try {
       const fd = buildTaskFormData(data);
       if (editing) {
@@ -154,6 +219,8 @@ function AdminTasksPageContent() {
       await load();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Save failed", "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -170,12 +237,16 @@ function AdminTasksPageContent() {
 
   const handleDelete = async (task: Task) => {
     if (!confirm(`Delete task “${task.name}”?`)) return;
+    if (deleteBusyId) return;
+    setDeleteBusyId(task.id);
     try {
       await drfDelete(`/api/v1/tasks/${task.id}/`);
       showToast("Task deleted successfully", "success");
       await load();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Delete failed", "error");
+    } finally {
+      setDeleteBusyId(null);
     }
   };
 
@@ -189,8 +260,8 @@ function AdminTasksPageContent() {
   }, [open]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between">
+    <div className="space-y-6 p-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="ui-page-title">Tasks</h1>
         <Button
           onClick={() => {
@@ -202,31 +273,135 @@ function AdminTasksPageContent() {
         </Button>
       </div>
 
-      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
-      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
+      {loading ? <p className="ui-body-muted">Loading…</p> : null}
+      {loadError ? <p className="ui-body text-red-600">{loadError}</p> : null}
+
+      <div className="rounded-xl border border-gray-200 bg-white p-3">
+        <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto py-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-x-3 [&::-webkit-scrollbar]:h-1">
+          <select
+            className="h-10 min-w-[10rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={employeeFilter}
+            onChange={(e) => setEmployeeFilter(e.target.value)}
+          >
+            <option value="">All employees</option>
+            {employeeOptions.map((employee) => (
+              <option key={employee.id} value={employee.name}>
+                {employee.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={projectFilter}
+            onChange={(e) => {
+              setProjectFilter(e.target.value);
+              setMilestoneFilter("");
+              setTaskFilter("");
+            }}
+          >
+            <option value="">All projects</option>
+            {projectOptions.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={milestoneFilter}
+            onChange={(e) => {
+              setMilestoneFilter(e.target.value);
+              setTaskFilter("");
+            }}
+          >
+            <option value="">All milestones</option>
+            {filteredMilestoneOptions.map((milestone) => (
+              <option key={milestone.id} value={milestone.id}>
+                {milestone.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={taskFilter}
+            onChange={(e) => setTaskFilter(e.target.value)}
+          >
+            <option value="">All tasks</option>
+            {taskFilterOptions.map((task) => (
+              <option key={task.id} value={task.id}>
+                {task.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={progressFilter}
+            onChange={(e) => setProgressFilter(e.target.value)}
+          >
+            <option value="">Any progress</option>
+            {progressOptions.map((progress) => (
+              <option key={progress} value={progress}>
+                {progress}
+              </option>
+            ))}
+          </select>
+
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setProjectFilter("");
+              setMilestoneFilter("");
+              setTaskFilter("");
+              setEmployeeFilter("");
+              setProgressFilter("");
+            }}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      </div>
 
       <TaskTable
-        tasks={tasks}
+        tasks={filteredTasks}
         projectNameMap={projectNameMap}
-        projectHrefMap={projectHrefMap}
         milestoneNameMap={milestoneNameMap}
         assignedByNameMap={assignedByNameMap}
         highlightRowId={highlightRowId}
+        onOpenProject={(id) => setProjectModalId(Number(id))}
+        deleteBusyId={deleteBusyId}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
 
+      <ProjectDetailModal
+        open={projectModalId != null}
+        projectId={projectModalId}
+        onClose={() => setProjectModalId(null)}
+      />
+
       {open ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto p-4 flex justify-center">
+        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto p-4">
           <button
             type="button"
             className="absolute inset-0 bg-black/45 backdrop-blur-sm"
-            onClick={closeModal}
+            onClick={() => {
+              if (!saving) closeModal();
+            }}
             aria-label="Close modal"
           />
-          <div className="relative z-50 my-6 w-full max-w-xl space-y-2 pointer-events-none">
-            <div className="flex justify-end pointer-events-auto">
-              <Button variant="secondary" size="icon" onClick={closeModal}>
+          <div className="pointer-events-none relative z-50 my-6 w-full max-w-xl space-y-2">
+            <div className="pointer-events-auto flex justify-end">
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={closeModal}
+                disabled={saving}
+              >
                 <X size={16} />
               </Button>
             </div>
@@ -238,6 +413,7 @@ function AdminTasksPageContent() {
                 projects={projectOptions}
                 milestones={milestoneOptions}
                 showAssignedBy
+                submitting={saving}
                 onSubmit={handleSubmit}
                 onCancel={closeModal}
               />
@@ -251,7 +427,7 @@ function AdminTasksPageContent() {
 
 export default function TaskPage() {
   return (
-    <Suspense fallback={<p className="p-6 text-sm text-gray-500">Loading…</p>}>
+    <Suspense fallback={<p className="p-6 ui-body-muted">Loading…</p>}>
       <AdminTasksPageContent />
     </Suspense>
   );

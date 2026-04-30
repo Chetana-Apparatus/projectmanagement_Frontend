@@ -1,58 +1,78 @@
 "use client";
 
 import { Pencil, Trash2 } from "lucide-react";
-import Link from "next/link";
 import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
 import Button from "@/components/ui/Button";
 
+export type TaskProgress =
+  | "Not Started"
+  | "Running"
+  | "Paused"
+  | "Stopped"
+  | "Complete"
+  | "Delayed";
+
 export type Task = {
   id: string;
   name: string;
+  description: string;
   project: string;
   milestone: string;
   employee: string;
   assignedBy: string;
   startDate: string;
   endDate: string;
-  status: "Not Started" | "In Progress" | "Completed" | "Paused" | "Stopped";
+  /** Editable task status in forms (maps to API). */
+  status:
+    | "Not Started"
+    | "In Progress"
+    | "Completed"
+    | "Paused"
+    | "Stopped"
+    | "Delayed";
+  /** Derived progress for the table (timer + status + overdue). */
+  progress: TaskProgress;
 };
 
 type TaskTableProps = {
   tasks: Task[];
   projectNameMap?: Record<string, string>;
-  projectHrefMap?: Record<string, string>;
   milestoneNameMap?: Record<string, string>;
   assignedByNameMap?: Record<string, string>;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onOpenProject?: (projectId: string) => void;
   highlightRowId?: string | null;
+  deleteBusyId?: string | null;
 };
 
 export default function TaskTable({
   tasks,
   projectNameMap = {},
-  projectHrefMap = {},
   milestoneNameMap = {},
   assignedByNameMap = {},
   onEdit,
   onDelete,
+  onOpenProject,
   highlightRowId = null,
+  deleteBusyId = null,
 }: TaskTableProps) {
-  const progressBadge = (status: Task["status"]) => {
-    const styleMap: Record<Task["status"], string> = {
-      Completed: "bg-emerald-100 text-emerald-700",
-      "In Progress": "bg-blue-100 text-blue-700",
-      Paused: "bg-amber-100 text-amber-700",
-      Stopped: "bg-rose-100 text-rose-700",
-      "Not Started": "bg-slate-100 text-slate-700",
+  const progressBadge = (progress: TaskProgress) => {
+    const styleMap: Record<TaskProgress, string> = {
+      Complete: "bg-green-100 text-green-700",
+      Running: "bg-blue-100 text-blue-700",
+      Paused: "bg-violet-100 text-violet-700",
+      Stopped: "bg-slate-200 text-slate-700",
+      "Not Started": "bg-gray-100 text-gray-600",
+      Delayed: "bg-rose-100 text-rose-700",
     };
     return (
       <span
-        className={`rounded-full px-2 py-0.5 text-xs font-medium ${styleMap[status]}`}
+        className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${styleMap[progress]}`}
       >
-        {status}
+        {progress}
       </span>
     );
   };
@@ -63,41 +83,70 @@ export default function TaskTable({
     { label: "Milestone", key: "milestone" },
     { label: "Assigned Employee", key: "employee" },
     { label: "Start Date", key: "startDate" },
-    { label: "End Date", key: "endDate" },
+    { label: "Expected date", key: "endDate" },
     { label: "Progress", key: "progress" },
     ...(onEdit || onDelete ? [{ label: "Actions", key: "actions" }] : []),
   ];
 
   return (
-    <DataTable<Task>
+    <DataTable
       columns={columns}
       data={tasks}
       emptyMessage="No tasks found"
       highlightRowId={highlightRowId}
+      visualVariant="employee"
+      cardClassName="items-start justify-start rounded-2xl border border-gray-100 shadow-sm"
       renderers={{
         project: (row) => {
           const label = projectNameMap[row.project] ?? row.project;
-          const href = projectHrefMap[row.project];
-          if (!href) return label;
+          if (onOpenProject) {
+            return (
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="block max-w-full truncate text-sm text-cs-text">
+                  {label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOpenProject(row.project)}
+                  className="w-fit cursor-pointer text-left text-sm text-blue-600 hover:underline"
+                >
+                  View project details
+                </button>
+              </div>
+            );
+          }
           return (
-            <div className="flex flex-col">
-              <span>{label}</span>
-              <Link
-                href={href}
-                className="text-xs text-sky-700 underline underline-offset-2 hover:text-sky-900"
-              >
-                Open Project
-              </Link>
-            </div>
+            <span className="block max-w-full truncate text-sm text-cs-text">
+              {label}
+            </span>
           );
         },
-        milestone: (row) => milestoneNameMap[row.milestone] ?? row.milestone,
-        employee: (row) =>
-          row.employee || assignedByNameMap[row.assignedBy] || "-",
-        status: (row) => progressBadge(row.status),
-        progress: (row) => {
-          return progressBadge(row.status);
-        },
+        milestone: (row) => (
+          <span className="block max-w-full truncate text-sm text-cs-text">
+            {milestoneNameMap[row.milestone] ?? row.milestone}
+          </span>
+        ),
+        employee: (row) => (
+          <span className="block max-w-full truncate text-sm text-cs-text">
+            {row.employee || assignedByNameMap[row.assignedBy] || "—"}
+          </span>
+        ),
+        name: (row) => (
+          <span className="block max-w-full truncate text-sm text-cs-text">
+            {row.name}
+          </span>
+        ),
+        startDate: (row) => (
+          <span className="whitespace-nowrap text-sm tabular-nums text-cs-text">
+            {row.startDate || "—"}
+          </span>
+        ),
+        endDate: (row) => (
+          <span className="whitespace-nowrap text-sm tabular-nums text-cs-text">
+            {row.endDate ? row.endDate.split("T")[0] : "—"}
+          </span>
+        ),
+        progress: (row) => progressBadge(row.progress),
         actions: (row) => (
           <div className="flex items-center justify-end gap-2">
             {onEdit ? (
@@ -117,6 +166,7 @@ export default function TaskTable({
                 variant="secondary"
                 className="flex h-8 w-8 items-center justify-center border-red-200 text-red-600 hover:border-red-200 hover:bg-red-50"
                 onClick={() => onDelete(row)}
+                disabled={deleteBusyId === row.id}
                 aria-label={`Delete task ${row.name}`}
               >
                 <Trash2 size={16} />

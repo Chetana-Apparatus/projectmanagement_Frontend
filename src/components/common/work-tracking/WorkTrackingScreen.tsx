@@ -1,11 +1,10 @@
 "use client";
 
-import { Select, Spin } from "antd";
+import { Spin } from "antd";
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
-  ListFilter,
   PauseCircle,
   PlayCircle,
 } from "lucide-react";
@@ -63,27 +62,16 @@ const STATUS_LABEL: Record<WorkLogUiStatus, string> = {
   blocked: "Blocked",
 };
 
-/** Plain status label + dot (not button-style chips). */
-const STATUS_DOT_CLASS: Record<WorkLogUiStatus, string> = {
-  "not-started": "bg-slate-400",
-  running: "bg-emerald-500",
-  paused: "bg-amber-500",
-  stopped: "bg-zinc-500",
-  "auto-stopped": "bg-violet-500",
-  completed: "bg-green-600",
-  delayed: "bg-orange-500",
-  blocked: "bg-stone-500",
-};
-
-const STATUS_TEXT_CLASS: Record<WorkLogUiStatus, string> = {
-  "not-started": "text-slate-800",
-  running: "text-emerald-800",
-  paused: "text-amber-900",
-  stopped: "text-zinc-800",
-  "auto-stopped": "text-violet-900",
-  completed: "text-green-800",
-  delayed: "text-orange-900",
-  blocked: "text-stone-800",
+/** Status pills aligned with employee task table (`statusClassMap`). */
+const STATUS_PILL_CLASS: Record<WorkLogUiStatus, string> = {
+  "not-started": "bg-gray-100 text-gray-600",
+  running: "bg-blue-100 text-blue-700",
+  paused: "bg-violet-100 text-violet-700",
+  stopped: "bg-slate-200 text-slate-700",
+  "auto-stopped": "bg-indigo-100 text-indigo-700",
+  completed: "bg-green-100 text-green-700",
+  delayed: "bg-rose-100 text-rose-700",
+  blocked: "bg-zinc-200 text-zinc-800",
 };
 
 function resolveWorkRowStatus(rec: WorkTrackingRecord): WorkLogUiStatus {
@@ -380,11 +368,6 @@ export default function WorkTrackingScreen() {
     setOnlyActive(false);
   };
 
-  const selectBlockCls =
-    "w-full [&_.ant-select-selector]:!min-h-[40px] [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!border-gray-200 [&_.ant-select-selector]:!bg-white [&_.ant-select-selector]:!px-2 [&_.ant-select-selector]:!shadow-sm [&_.ant-select-selector]:hover:!border-gray-300 [&_.ant-select-focused.ant-select]:!shadow-md [&_.ant-select-selection-item]:!leading-[38px] [&_.ant-select-selection-placeholder]:!leading-[38px]";
-
-  const filterLabelCls = "text-sm font-semibold text-gray-700";
-
   const employeeSelectOptions = useMemo(
     () =>
       employees.map((u) => ({
@@ -449,7 +432,7 @@ export default function WorkTrackingScreen() {
       {
         key: "running",
         title: "Running",
-        hint: "Timer on",
+
         value: summary.started,
         color: "text-emerald-700",
         iconBg: "text-emerald-500/80",
@@ -458,7 +441,7 @@ export default function WorkTrackingScreen() {
       {
         key: "completed",
         title: "Complete",
-        hint: "Task marked done",
+
         value: summary.completed,
         color: "text-teal-800",
         iconBg: "text-teal-600/80",
@@ -467,7 +450,7 @@ export default function WorkTrackingScreen() {
       {
         key: "delayed",
         title: "Delayed",
-        hint: "Task flagged late",
+
         value: summary.delayed,
         color: "text-orange-800",
         iconBg: "text-orange-500/80",
@@ -476,7 +459,6 @@ export default function WorkTrackingScreen() {
       {
         key: "paused",
         title: "Paused",
-        hint: "Employee paused",
         value: summary.paused,
         color: "text-amber-800",
         iconBg: "text-amber-500/80",
@@ -490,13 +472,7 @@ export default function WorkTrackingScreen() {
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="ui-page-title">Work tracking</h1>
-          <p className="ui-body-muted max-w-2xl">
-            See who is on the clock and what they are working on. Timer history
-            appears in the last column when a task has recorded starts, pauses,
-            stops, or auto stops. Newest activity is listed first. Data
-            refreshes every 30 seconds.
-          </p>
+          <h2 className="h2">Work tracking</h2>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <Activity className="h-4 w-4 text-emerald-600" aria-hidden />
@@ -514,232 +490,159 @@ export default function WorkTrackingScreen() {
         className="grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-4"
         aria-label="Work status summary"
       >
-        {summaryCards.map(
-          ({ key, title, hint, value, color, iconBg, Icon }) => (
-            <li key={key} className="min-w-0">
-              <Card
-                variant="surface"
-                padding="none"
-                className="h-full border border-gray-100/90 p-3 shadow-sm !flex-row !items-center !justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                    {title}
-                  </p>
-                  <p
-                    className={`mt-1 text-xl font-bold tabular-nums tracking-tight ${color}`}
-                  >
-                    {value}
-                  </p>
-                  <p className="mt-0.5 text-[10px] leading-snug text-gray-500">
-                    {hint}
-                  </p>
-                </div>
-                <Icon className={`h-6 w-6 shrink-0 ${iconBg}`} aria-hidden />
-              </Card>
-            </li>
-          ),
-        )}
+        {summaryCards.map(({ key, title, value, color, iconBg, Icon }) => (
+          <li key={key} className="min-w-0">
+            <Card
+              variant="surface"
+              padding="none"
+              className="h-full border border-gray-100/90 p-3 shadow-sm !flex-row !items-center !justify-between gap-2"
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                  {title}
+                </p>
+                <p
+                  className={`mt-1 text-xl font-bold tabular-nums tracking-tight ${color}`}
+                >
+                  {value}
+                </p>
+              </div>
+              <Icon className={`h-6 w-6 shrink-0 ${iconBg}`} aria-hidden />
+            </Card>
+          </li>
+        ))}
       </ul>
 
       <Card
         variant="surface"
         padding="none"
-        className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.03]"
+        className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
       >
-        <div className="flex flex-col lg:flex-row lg:items-stretch">
-          <aside className="flex shrink-0 flex-col justify-between gap-4 border-b border-gray-200/80 bg-slate-50/70 px-5 py-5 sm:px-6 lg:w-[min(100%,18rem)] lg:border-b-0 lg:border-r lg:border-gray-200/80 xl:w-72">
-            <div className="flex gap-3">
-              <div
-                className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-sm"
-                aria-hidden
-              >
-                <ListFilter className="h-[18px] w-[18px]" strokeWidth={2.25} />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold tracking-tight text-gray-900">
-                  Filters
-                </h2>
-                <p className="mt-1.5 text-xs leading-snug text-gray-600">
-                  Narrow the table by who is working and on which work items.
-                </p>
-              </div>
+        <div className="relative px-0 py-2.5 sm:py-3">
+          {optionsLoading ? (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/85 backdrop-blur-[1px]">
+              <Spin size="large" />
+              <span className="text-sm font-medium text-gray-600">
+                Loading options…
+              </span>
             </div>
+          ) : null}
+
+          <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto px-0 py-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-x-3 [&::-webkit-scrollbar]:h-1">
+            <select
+              className="h-10 min-w-[10rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              disabled={optionsLoading}
+            >
+              <option value="">All employees</option>
+              {employeeSelectOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setMilestoneId("");
+                setTaskId("");
+              }}
+              disabled={optionsLoading}
+            >
+              <option value="">All projects</option>
+              {projectSelectOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              value={milestoneId}
+              onChange={(e) => {
+                setMilestoneId(e.target.value);
+                setTaskId("");
+              }}
+              disabled={optionsLoading}
+            >
+              <option value="">
+                {projectId ? "This project's milestones" : "All milestones"}
+              </option>
+              {milestoneSelectOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              value={taskId}
+              onChange={(e) => setTaskId(e.target.value)}
+              disabled={optionsLoading}
+            >
+              <option value="">All tasks</option>
+              {taskSelectOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              disabled={optionsLoading}
+            >
+              <option value="">Any status</option>
+              {taskStatusSelectOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <label className="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 hover:border-gray-300">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-sky-600"
+                checked={onlyActive}
+                onChange={(e) => setOnlyActive(e.target.checked)}
+              />
+              <span className="whitespace-nowrap">Running only</span>
+            </label>
+
             <Button
               type="button"
               variant="secondary"
-              className="h-10 w-full shrink-0 px-4"
+              className="h-9 shrink-0 px-3 text-sm"
               onClick={clearFilters}
             >
-              Clear all
+              Clear Filters
             </Button>
-          </aside>
-
-          <div className="relative min-w-0 flex-1 bg-[linear-gradient(180deg,#fafafa_0%,#ffffff_40px)] px-5 py-5 sm:px-6 lg:pl-6">
-            {optionsLoading ? (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/85 backdrop-blur-[1px]">
-                <Spin size="large" />
-                <span className="text-sm font-medium text-gray-600">
-                  Loading options…
-                </span>
-              </div>
-            ) : null}
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="flex min-w-0 flex-col gap-2">
-                  <span id="wt-lbl-employee" className={filterLabelCls}>
-                    Employee
-                  </span>
-                  <Select
-                    aria-labelledby="wt-lbl-employee"
-                    allowClear
-                    showSearch
-                    placeholder="Everyone"
-                    disabled={optionsLoading}
-                    className={selectBlockCls}
-                    value={employeeId || undefined}
-                    onChange={(v) => setEmployeeId(v ?? "")}
-                    options={employeeSelectOptions}
-                    optionFilterProp="label"
-                    popupMatchSelectWidth={false}
-                  />
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-2">
-                  <span id="wt-lbl-project" className={filterLabelCls}>
-                    Project
-                  </span>
-                  <Select
-                    aria-labelledby="wt-lbl-project"
-                    allowClear
-                    showSearch
-                    placeholder="All projects"
-                    disabled={optionsLoading}
-                    className={selectBlockCls}
-                    value={projectId || undefined}
-                    onChange={(v) => {
-                      setProjectId(v ?? "");
-                      setMilestoneId("");
-                      setTaskId("");
-                    }}
-                    options={projectSelectOptions}
-                    optionFilterProp="label"
-                    popupMatchSelectWidth={false}
-                  />
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-2">
-                  <span id="wt-lbl-milestone" className={filterLabelCls}>
-                    Milestone
-                  </span>
-                  <Select
-                    aria-labelledby="wt-lbl-milestone"
-                    allowClear
-                    showSearch
-                    placeholder={projectId ? "This project" : "All milestones"}
-                    disabled={optionsLoading}
-                    className={selectBlockCls}
-                    value={milestoneId || undefined}
-                    onChange={(v) => {
-                      setMilestoneId(v ?? "");
-                      setTaskId("");
-                    }}
-                    options={milestoneSelectOptions}
-                    optionFilterProp="label"
-                    popupMatchSelectWidth={false}
-                    listHeight={320}
-                    notFoundContent={
-                      projectId
-                        ? "No milestones in this project"
-                        : "No milestones loaded"
-                    }
-                  />
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-2">
-                  <span id="wt-lbl-task" className={filterLabelCls}>
-                    Task
-                  </span>
-                  <Select
-                    aria-labelledby="wt-lbl-task"
-                    allowClear
-                    showSearch
-                    placeholder="All tasks"
-                    disabled={optionsLoading}
-                    className={selectBlockCls}
-                    value={taskId || undefined}
-                    onChange={(v) => setTaskId(v ?? "")}
-                    options={taskSelectOptions}
-                    optionFilterProp="label"
-                    popupMatchSelectWidth={false}
-                  />
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-2">
-                  <span id="wt-lbl-status" className={filterLabelCls}>
-                    Task status
-                  </span>
-                  <Select
-                    aria-labelledby="wt-lbl-status"
-                    allowClear
-                    placeholder="Any status"
-                    disabled={optionsLoading}
-                    className={selectBlockCls}
-                    value={status || undefined}
-                    onChange={(v) => setStatus(v ?? "")}
-                    options={taskStatusSelectOptions}
-                    popupMatchSelectWidth={false}
-                  />
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-2">
-                  <span className={filterLabelCls}>Timer</span>
-                  <label className="flex h-10 min-h-10 w-full cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-sky-200">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 shrink-0 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
-                      checked={onlyActive}
-                      onChange={(e) => setOnlyActive(e.target.checked)}
-                    />
-                    <span className="min-w-0 text-sm font-medium leading-snug text-gray-800">
-                      Only running timers
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {!projectId &&
-              !optionsLoading &&
-              milestoneSelectOptions.length > 0 ? (
-                <div className="rounded-lg border border-sky-100 bg-sky-50/70 px-3 py-2 text-[11px] leading-relaxed text-sky-950">
-                  Milestones from <strong>all</strong> projects—pick a project
-                  to shorten the list.
-                </div>
-              ) : null}
-              {projectId &&
-              !optionsLoading &&
-              milestoneSelectOptions.length === 0 ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
-                  No milestones here—try another project or clear project.
-                </div>
-              ) : null}
-            </div>
           </div>
         </div>
       </Card>
 
-      <DataTable<WorkLogRow>
+      <DataTable
         columns={columns}
         data={logs}
         pageSize={10}
         showPaginationSizeChanger
         paginationPageSizeOptions={[10, 20, 50]}
         paginationHideOnSinglePage={false}
+        visualVariant="employee"
+        cardClassName="items-start justify-start rounded-2xl border border-gray-100 shadow-sm"
         emptyMessage="No work tracking rows match your filters."
         renderers={{
           employee: (row) => (
-            <span className="text-sm font-semibold text-gray-900">
+            <span className="block max-w-full truncate text-sm text-cs-text">
               {row.employee}
             </span>
           ),
@@ -747,48 +650,44 @@ export default function WorkTrackingScreen() {
             <button
               type="button"
               onClick={() => setProjectModalId(row.projectId)}
-              className="text-left text-sm font-semibold text-sky-700 underline-offset-2 hover:text-sky-900 hover:underline"
+              className="max-w-full cursor-pointer truncate text-left text-sm text-blue-600 hover:underline"
             >
               {row.project}
             </button>
           ),
           milestone: (row) => (
-            <span className="text-sm text-gray-800">{row.milestone}</span>
+            <span className="block max-w-full truncate text-sm text-cs-text">
+              {row.milestone}
+            </span>
           ),
           task: (row) => (
-            <span className="text-sm font-semibold text-gray-900">
+            <span className="block max-w-full truncate text-sm text-cs-text">
               {row.task}
             </span>
           ),
           status: (row) => {
             const statusKey = row.status;
             return (
-              <span className="inline-flex max-w-full items-center gap-2">
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT_CLASS[statusKey]}`}
-                  aria-hidden
-                />
-                <span
-                  className={`text-sm font-medium ${STATUS_TEXT_CLASS[statusKey]}`}
-                >
-                  {STATUS_LABEL[statusKey]}
-                </span>
+              <span
+                className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${STATUS_PILL_CLASS[statusKey]}`}
+              >
+                {STATUS_LABEL[statusKey]}
               </span>
             );
           },
           sessionStart: (row) => (
-            <span className="whitespace-nowrap font-mono text-sm font-medium text-gray-900">
+            <span className="whitespace-nowrap font-mono text-sm tabular-nums text-cs-text">
               {row.sessionStart}
             </span>
           ),
           workingTime: (row) => (
-            <span className="font-mono text-sm font-semibold text-gray-900 tabular-nums">
+            <span className="font-mono text-sm font-medium tabular-nums text-cs-text">
               {row.workingTime}
             </span>
           ),
           historyDetail: (row) =>
             row.historyDetail ? (
-              <span className="text-sm tabular-nums leading-snug text-gray-800">
+              <span className="text-sm tabular-nums leading-snug text-cs-text">
                 {row.historyDetail}
               </span>
             ) : (

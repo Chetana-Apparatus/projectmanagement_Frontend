@@ -250,6 +250,29 @@
   color: oklch(0.373 0 0);
 }
 
+/* Multiline fields in forms — matches input height/radius rhythm */
+.ui-textarea {
+  min-height: 5.5rem;
+  width: 100%;
+  resize: vertical;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--cs-text);
+}
+
+.ui-textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+.ui-textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px oklch(0.708 0 0 / 0.35);
+}
+
 /* Shared elevated panel (dashboard tables, metrics, activity) */
 .surface-card {
   border-radius: 1rem;

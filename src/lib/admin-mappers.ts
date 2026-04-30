@@ -1,7 +1,7 @@
 import type { MilestoneRecord } from "@/components/common/milestones/MilestoneTable";
 import type { Project } from "@/components/common/projects/ProjectTable";
 import type { TaskFormValues } from "@/components/common/tasks/TaskForm";
-import type { Task } from "@/components/common/tasks/TaskTable";
+import type { Task, TaskProgress } from "@/components/common/tasks/TaskTable";
 import type { UserRecord } from "@/components/common/users/UserTable";
 
 /** --- Users --- */
@@ -370,7 +370,29 @@ export type ApiTask = {
   status: string;
   deadline?: string | null;
   created_at?: string;
+  /** Present when assignee has an active TimeLog (timer running). */
+  timer_state?: string | null;
 };
+
+function taskDeadlineYmd(deadline: string | null | undefined): string | null {
+  if (!deadline) return null;
+  return deadline.split("T")[0];
+}
+
+/** Progress column: timer + status + overdue (expected date < today, not complete). */
+export function deriveTaskProgress(t: ApiTask): TaskProgress {
+  const ymd = taskDeadlineYmd(t.deadline ?? null);
+  const today = new Date().toISOString().split("T")[0];
+  const overdue = Boolean(ymd && ymd < today && t.status !== "COMPLETED");
+  if (overdue || t.status === "DELAYED") return "Delayed";
+  if (t.status === "COMPLETED") return "Complete";
+  if (t.timer_state === "STARTED") return "Running";
+  if (t.status === "PAUSED") return "Paused";
+  if (t.status === "IN_PROGRESS") return "Stopped";
+  if (t.status === "BLOCKED") return "Stopped";
+  if (t.status === "NOT_STARTED") return "Not Started";
+  return "Not Started";
+}
 
 function apiTaskStatusToUi(s: string): Task["status"] {
   switch (s) {
@@ -383,6 +405,7 @@ function apiTaskStatusToUi(s: string): Task["status"] {
     case "PAUSED":
       return "Paused";
     case "DELAYED":
+      return "Delayed";
     case "BLOCKED":
       return "Stopped";
     default:
@@ -402,6 +425,8 @@ function uiTaskStatusToApi(s: Task["status"]): string {
       return "BLOCKED";
     case "Completed":
       return "COMPLETED";
+    case "Delayed":
+      return "DELAYED";
     default:
       return "NOT_STARTED";
   }
@@ -413,6 +438,7 @@ export function apiTaskToRow(t: ApiTask): Task {
   return {
     id: String(t.id),
     name: t.title,
+    description: t.description ?? "",
     project: String(t.project),
     milestone: t.milestone != null ? String(t.milestone) : "",
     employee: t.assigned_to_name ?? "",
@@ -420,12 +446,14 @@ export function apiTaskToRow(t: ApiTask): Task {
     startDate: created,
     endDate: deadline,
     status: apiTaskStatusToUi(t.status),
+    progress: deriveTaskProgress(t),
   };
 }
 
 export function buildTaskFormData(v: TaskFormValues): FormData {
   const fd = new FormData();
   fd.append("title", v.name.trim());
+  fd.append("description", v.description.trim());
   fd.append("project", v.project);
   if (v.milestone) {
     fd.append("milestone", v.milestone);

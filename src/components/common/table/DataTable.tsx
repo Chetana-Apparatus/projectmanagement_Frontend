@@ -3,11 +3,14 @@
 import { Table, type TableColumnsType, type TablePaginationConfig } from "antd";
 import { useMemo } from "react";
 import Card from "@/components/common/card/Card";
+import { cn } from "@/lib/utils";
 
 export type DataTableColumn = {
   label: string;
   key: string;
 };
+
+export type DataTableVisualVariant = "default" | "employee";
 
 type DataTableProps<T extends Record<string, unknown>> = {
   columns: DataTableColumn[];
@@ -29,6 +32,9 @@ type DataTableProps<T extends Record<string, unknown>> = {
    * Set `false` to always show the pager (e.g. work tracking).
    */
   paginationHideOnSinglePage?: boolean;
+  /** Match employee task table: gray header row, body typography, row hover. */
+  visualVariant?: DataTableVisualVariant;
+  cardClassName?: string;
 };
 
 export default function DataTable<T extends Record<string, unknown>>({
@@ -43,6 +49,8 @@ export default function DataTable<T extends Record<string, unknown>>({
   paginationPageSizeOptions = [10, 20, 50],
   highlightRowId = null,
   paginationHideOnSinglePage = true,
+  visualVariant = "default",
+  cardClassName,
 }: DataTableProps<T>) {
   const tableColumns = useMemo<TableColumnsType<T>>(
     () =>
@@ -51,11 +59,16 @@ export default function DataTable<T extends Record<string, unknown>>({
         dataIndex: column.key,
         key: column.key,
         onHeaderCell: () => ({
-          className: "px-6 py-4 text-xs font-semibold uppercase text-gray-500",
+          className:
+            visualVariant === "employee"
+              ? "px-4 py-4 text-sm font-semibold text-gray-800 !bg-gray-50/95 border-b border-gray-200"
+              : "px-6 py-4 text-xs font-semibold uppercase text-gray-500",
         }),
         onCell: () => ({
           className:
-            "px-6 py-4 align-top text-sm text-gray-700 whitespace-normal break-words",
+            visualVariant === "employee"
+              ? "px-4 py-4 align-middle text-sm text-gray-800 border-b border-gray-100"
+              : "px-6 py-4 align-top text-sm text-gray-700 whitespace-normal break-words",
         }),
         render: (_value: unknown, row: T) => {
           const value = row[column.key];
@@ -63,7 +76,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           return cellRenderer ? cellRenderer(row, value) : String(value ?? "-");
         },
       })),
-    [columns, renderers],
+    [columns, renderers, visualVariant],
   );
 
   const pagination = useMemo<TablePaginationConfig | false>(
@@ -90,18 +103,29 @@ export default function DataTable<T extends Record<string, unknown>>({
     <Card
       variant="surface"
       padding="none"
-      className="w-full !flex-col !items-stretch !justify-start"
+      className={cn(
+        "w-full !flex-col !items-stretch !justify-start",
+        cardClassName,
+      )}
     >
       <Table<T>
-        className="w-full"
+        className={cn(
+          "w-full",
+          visualVariant === "employee" &&
+            "[&_.ant-table-thead>tr>th]:!bg-gray-50/95 [&_.ant-table-thead>tr>th]:before:!hidden",
+        )}
         rowKey={(row) =>
           String((row as { id?: string | number }).id ?? JSON.stringify(row))
         }
         rowClassName={(row) => {
           const id = String((row as { id?: string | number }).id ?? "");
-          return id && highlightRowId && id === highlightRowId
-            ? "!bg-sky-100/90 transition-colors duration-300"
-            : "";
+          const hl =
+            id && highlightRowId && id === highlightRowId
+              ? "!bg-sky-100/90 transition-colors duration-300"
+              : "";
+          const hover =
+            visualVariant === "employee" ? "hover:!bg-gray-50/60" : "";
+          return [hl, hover].filter(Boolean).join(" ");
         }}
         columns={tableColumns}
         dataSource={data}
