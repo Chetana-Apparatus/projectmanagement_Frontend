@@ -16,7 +16,9 @@ export function progressBarValue(percent: number | null | undefined): number {
 }
 
 /** Human-readable label (avoids showing 0% when value is small but positive). */
-export function formatProgressLabel(percent: number | null | undefined): string {
+export function formatProgressLabel(
+  percent: number | null | undefined,
+): string {
   const v = clampProgress(percent);
   if (v <= 0) return "0%";
   if (v < 0.01) return `${v.toFixed(2)}%`;
