@@ -1,11 +1,11 @@
 "use client";
-
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import Card from "@/components/common/card/Card";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
   type EmployeeManagedTask,
+  statusBadgeLayoutClass,
   statusClassMap,
 } from "@/features/employee-tasks/status";
 
@@ -29,7 +29,7 @@ const columns: ColumnsType<EmployeeManagedTask> = [
     align: "center",
     render: (_, record) => (
       <span
-        className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${statusClassMap[record.status]}`}
+        className={`${statusBadgeLayoutClass} ${statusClassMap[record.status]}`}
       >
         {record.status}
       </span>

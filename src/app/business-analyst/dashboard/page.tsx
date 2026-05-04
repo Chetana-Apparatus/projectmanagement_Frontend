@@ -17,6 +17,7 @@ import DashboardCard from "@/components/common/dashboard/DashboardCard";
 import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
+import { statusBadgeLayoutClass } from "@/features/employee-tasks/status";
 import {
   type BADashboardPayload,
   fetchBADashboard,
@@ -298,15 +299,13 @@ export default function BADashboardPage() {
               const styles: Record<ProjectOverviewRow["status"], string> = {
                 "Not Started": "bg-slate-100 text-slate-700",
                 "In Progress": "bg-blue-100 text-blue-700",
-                Paused: "bg-amber-100 text-amber-700",
-                Stopped: "bg-zinc-200 text-zinc-800",
+                Paused: "bg-yellow-100 text-yellow-700",
+                Stopped: "bg-red-100 text-red-700",
                 Delayed: "bg-rose-100 text-rose-700",
-                Completed: "bg-emerald-100 text-emerald-700",
+                Completed: "bg-green-100 text-green-700",
               };
               return (
-                <span
-                  className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${styles[status]}`}
-                >
+                <span className={`${statusBadgeLayoutClass} ${styles[status]}`}>
                   {status}
                 </span>
               );
@@ -339,7 +338,7 @@ export default function BADashboardPage() {
 
                 return (
                   <span
-                    className={`px-2 py-1 text-xs rounded-full ${styles[status]}`}
+                    className={`${statusBadgeLayoutClass} ${styles[status]}`}
                   >
                     {status}
                   </span>

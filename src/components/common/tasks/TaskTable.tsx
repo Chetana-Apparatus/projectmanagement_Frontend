@@ -5,6 +5,7 @@ import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
 import Button from "@/components/ui/Button";
+import { statusBadgeLayoutClass } from "@/features/employee-tasks/status";
 
 export type TaskProgress =
   | "Not Started"
@@ -85,7 +86,7 @@ export default function TaskTable({
                 ? "Timer stopped automatically (e.g. end-of-day cutoff)"
                 : undefined
         }
-        className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${styleMap[progress]}`}
+        className={`${statusBadgeLayoutClass} max-w-full font-semibold ${styleMap[progress]}`}
       >
         {progress}
       </span>
@@ -117,15 +118,12 @@ export default function TaskTable({
           if (onOpenProject) {
             return (
               <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="block max-w-full truncate text-sm text-cs-text">
-                  {label}
-                </span>
                 <button
                   type="button"
                   onClick={() => onOpenProject(row.project)}
-                  className="w-fit cursor-pointer text-left text-sm text-blue-600 hover:underline"
+                  className="block max-w-full cursor-pointer truncate text-left text-sm font-medium !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700"
                 >
-                  View project details
+                  {label}
                 </button>
               </div>
             );
@@ -163,12 +161,12 @@ export default function TaskTable({
         ),
         progress: (row) => progressBadge(row.progress),
         actions: (row) => (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-center gap-2">
             {onEdit ? (
               <Button
                 type="button"
                 variant="secondary"
-                className="flex h-8 w-8 items-center justify-center border-sky-200 text-sky-600 hover:border-sky-200 hover:bg-sky-50"
+                className="flex h-8 w-8 items-center justify-center border-sky-200 !text-sky-600 hover:border-sky-200 hover:bg-sky-50 hover:!text-sky-700"
                 onClick={() => onEdit(row)}
                 aria-label={`Edit task ${row.name}`}
               >
@@ -179,7 +177,7 @@ export default function TaskTable({
               <Button
                 type="button"
                 variant="secondary"
-                className="flex h-8 w-8 items-center justify-center border-red-200 text-red-600 hover:border-red-200 hover:bg-red-50"
+                className="flex h-8 w-8 items-center justify-center border-red-200 !text-red-600 hover:border-red-200 hover:bg-red-50 hover:!text-red-700"
                 onClick={() => onDelete(row)}
                 disabled={deleteBusyId === row.id}
                 aria-label={`Delete task ${row.name}`}

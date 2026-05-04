@@ -133,13 +133,13 @@ export default function DataTable<T extends Record<string, unknown>>({
       variant="surface"
       padding="none"
       className={cn(
-        "w-full !flex-col !items-stretch !justify-start",
+        "w-full overflow-hidden rounded-2xl border border-gray-200 !flex-col !items-stretch !justify-start",
         cardClassName,
       )}
     >
       <Table<T>
         className={cn(
-          "w-full",
+          "w-full [&_.ant-table-container]:overflow-hidden [&_.ant-table-container]:rounded-b-2xl",
           visualVariant === "employee" &&
             "[&_.ant-table-thead>tr>th]:!bg-gray-50/95 [&_.ant-table-thead>tr>th]:before:!hidden",
         )}

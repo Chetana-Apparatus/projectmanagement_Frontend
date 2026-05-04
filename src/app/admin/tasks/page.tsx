@@ -262,7 +262,7 @@ function AdminTasksPageContent() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="ui-page-title">Tasks</h1>
+        <h2 className="h2">Tasks</h2>
         <Button
           onClick={() => {
             setEditing(null);

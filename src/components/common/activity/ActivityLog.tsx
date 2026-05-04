@@ -1,5 +1,6 @@
 import { Activity } from "lucide-react";
 import Card from "@/components/common/card/Card";
+import { statusBadgeLayoutClass } from "@/features/employee-tasks/status";
 
 export type ActivityLogItem = {
   id: string;
@@ -18,16 +19,16 @@ export default function ActivityLog({ items, title }: ActivityLogProps) {
     const normalized = label.toUpperCase();
     const style =
       normalized === "COMPLETED"
-        ? "bg-emerald-100 text-emerald-700"
+        ? "bg-green-100 text-green-700"
         : normalized === "STARTED"
           ? "bg-blue-100 text-blue-700"
           : normalized === "PAUSED"
-            ? "bg-amber-100 text-amber-700"
-            : "bg-slate-100 text-slate-700";
+            ? "bg-yellow-100 text-yellow-700"
+            : normalized === "STOPPED"
+              ? "bg-red-100 text-red-700"
+              : "bg-slate-100 text-slate-700";
     return (
-      <span
-        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${style}`}
-      >
+      <span className={`${statusBadgeLayoutClass} font-semibold ${style}`}>
         {label}
       </span>
     );

@@ -1,5 +1,4 @@
 "use client";
-
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -22,15 +21,17 @@ import type { ManagedTaskStatus } from "@/features/employee-tasks/status";
 function getStatusVariant(status: ManagedTaskStatus) {
   switch (status) {
     case "In Progress":
-      return "onTrack";
+      return "taskInProgress";
     case "Paused":
-      return "active";
+      return "taskPaused";
+    case "Stopped":
+      return "taskStopped";
+    case "Completed":
+      return "taskCompleted";
     case "Delayed":
       return "delayed";
-    case "Stopped":
     case "Blocked":
     case "Not Started":
-    case "Completed":
       return "deactivated";
     default:
       return "deactivated";
@@ -140,13 +141,13 @@ export default function EmployeeDashboardPage() {
       {
         label: "Paused",
         value: tasks.filter((task) => task.status === "Paused").length,
-        valueClass: "text-violet-600",
+        valueClass: "text-yellow-700",
         icon: PauseCircle,
       },
       {
         label: "Completed",
         value: completedTasksCount,
-        valueClass: "text-emerald-600",
+        valueClass: "text-green-700",
         icon: CircleCheck,
       },
       {
@@ -216,7 +217,7 @@ export default function EmployeeDashboardPage() {
           <div className="flex w-full justify-end items-center gap-3">
             {!isRunning ? (
               <Button
-                className="h-9 px-4 text-sm"
+                className="h-9 px-4 text-md"
                 disabled={disableAllActions || !canStart}
                 onClick={handleStart}
               >
@@ -226,8 +227,7 @@ export default function EmployeeDashboardPage() {
             ) : (
               <>
                 <Button
-                  variant="ghost"
-                  className="h-9 border border-rose-300 bg-transparent px-4 text-sm text-rose-600 hover:border-rose-400 hover:text-rose-700"
+                  className="h-9  bg-transparent px-4 text-md text-rose-600  hover:text-rose-700"
                   disabled={disableAllActions || !canStop}
                   onClick={handleStop}
                 >
@@ -236,7 +236,7 @@ export default function EmployeeDashboardPage() {
                 </Button>
                 <Button
                   variant="secondary"
-                  className="h-9 px-4 text-sm"
+                  className="h-9 px-4 text-md"
                   disabled={disableAllActions || !canPause || !isRunning}
                   onClick={handlePause}
                 >

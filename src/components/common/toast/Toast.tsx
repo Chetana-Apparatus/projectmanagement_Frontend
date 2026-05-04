@@ -40,23 +40,21 @@ export default function Toast({ toast, onClose }: ToastProps) {
   return (
     <output
       className={cn(
-        "pointer-events-auto flex w-full max-w-sm flex-nowrap items-center justify-between gap-3 overflow-hidden rounded-xl border px-4 py-3 shadow-lg",
+        "pointer-events-auto grid w-full max-w-sm grid-cols-[auto,1fr,auto] items-center gap-2 overflow-hidden rounded-xl border px-4 py-3 shadow-lg",
         "animate-in slide-in-from-top-5 fade-in-50 duration-300",
         style.container,
       )}
       aria-live="polite"
     >
-      <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden">
-        <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-          {style.icon}
-        </div>
-        <p className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5">
-          {toast.message}
-        </p>
+      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+        {style.icon}
       </div>
+      <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-5">
+        {toast.message}
+      </p>
       <button
         type="button"
-        className="inline-flex h-7 w-7 shrink-0 flex-none items-center justify-center self-center rounded-lg text-current/70 leading-none transition-colors hover:bg-black/5 hover:text-current"
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-current/70 leading-none transition-colors hover:bg-black/5 hover:text-current"
         onClick={() => onClose(toast.id)}
         aria-label="Close notification"
       >

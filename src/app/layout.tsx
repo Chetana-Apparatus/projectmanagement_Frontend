@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "antd/dist/reset.css";
+import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
+import GlobalToastContainer from "@/components/common/toast/GlobalToastContainer";
 import ClientWrapper from "@/components/wrappers/ClientWrapper";
 
 export const metadata: Metadata = {
@@ -16,7 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full antialiased`}>
       <body>
-        <ClientWrapper>{children}</ClientWrapper>
+        <ClientWrapper>
+          {children}
+          <GlobalToastContainer />
+        </ClientWrapper>
       </body>
     </html>
   );

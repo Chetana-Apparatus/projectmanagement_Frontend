@@ -15,6 +15,8 @@ import DataTable, {
 } from "@/components/common/table/DataTable";
 import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
+import { useLoader } from "@/context/LoaderContext";
+import { statusBadgeLayoutClass } from "@/features/employee-tasks/status";
 import {
   fetchWorkTracking,
   type WorkTrackingRecord,
@@ -46,7 +48,6 @@ type WorkLogRow = {
   task: string;
   status: WorkLogUiStatus;
   sessionStart: string;
-  /** Timer summary for last column; `null` when there is no activity to show. */
   historyDetail: string | null;
   workingTime: string;
 } & Record<string, unknown>;
@@ -118,10 +119,6 @@ function formatSessionStart(rec: WorkTrackingRecord): string {
   return "—";
 }
 
-/**
- * Start / pause / stop counts only; auto stop appended only when count is greater than zero.
- * Returns `null` when there is no timer activity to display.
- */
 function buildHistoryDetail(rec: WorkTrackingRecord): string | null {
   const h = rec.history;
   if (!h) return null;
@@ -211,6 +208,7 @@ const emptySummary: SummaryState = {
 };
 
 export default function WorkTrackingScreen() {
+  const { setLoading: setGlobalLoading } = useLoader();
   const [logs, setLogs] = useState<WorkLogRow[]>([]);
   const [summary, setSummary] = useState<SummaryState>(emptySummary);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -333,6 +331,13 @@ export default function WorkTrackingScreen() {
     }, 30000);
     return () => window.clearInterval(interval);
   }, [load]);
+
+  useEffect(() => {
+    setGlobalLoading(loading || optionsLoading);
+    return () => {
+      setGlobalLoading(false);
+    };
+  }, [loading, optionsLoading, setGlobalLoading]);
 
   useEffect(() => {
     if (!milestoneId) return;
@@ -474,6 +479,9 @@ export default function WorkTrackingScreen() {
     [summary.started, summary.completed, summary.delayed, summary.paused],
   );
 
+  const filterClass =
+    "h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-[180px]";
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -504,7 +512,7 @@ export default function WorkTrackingScreen() {
               className="h-full border border-gray-100/90 p-3 shadow-sm !flex-row !items-center !justify-between gap-2"
             >
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                <p className="p1  uppercase tracking-wide text-gray-500">
                   {title}
                 </p>
                 <p
@@ -522,9 +530,9 @@ export default function WorkTrackingScreen() {
       <Card
         variant="surface"
         padding="none"
-        className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+        className="rounded-xl border border-gray-200 bg-white shadow-sm"
       >
-        <div className="relative px-0 py-2.5 sm:py-3">
+        <div className="relative px-3 py-2.5 sm:px-4 sm:py-3">
           {optionsLoading ? (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/85 backdrop-blur-[1px]">
               <Spin size="large" />
@@ -533,13 +541,11 @@ export default function WorkTrackingScreen() {
               </span>
             </div>
           ) : null}
-
-          <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto px-0 py-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-x-3 [&::-webkit-scrollbar]:h-1">
+          <div className="flex flex-wrap items-center gap-2">
             <select
-              className="h-10 min-w-[10rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              className={filterClass}
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
-              disabled={optionsLoading}
             >
               <option value="">All employees</option>
               {employeeSelectOptions.map((opt) => (
@@ -550,14 +556,9 @@ export default function WorkTrackingScreen() {
             </select>
 
             <select
-              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              className={filterClass}
               value={projectId}
-              onChange={(e) => {
-                setProjectId(e.target.value);
-                setMilestoneId("");
-                setTaskId("");
-              }}
-              disabled={optionsLoading}
+              onChange={(e) => setProjectId(e.target.value)}
             >
               <option value="">All projects</option>
               {projectSelectOptions.map((opt) => (
@@ -568,17 +569,11 @@ export default function WorkTrackingScreen() {
             </select>
 
             <select
-              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              className={filterClass}
               value={milestoneId}
-              onChange={(e) => {
-                setMilestoneId(e.target.value);
-                setTaskId("");
-              }}
-              disabled={optionsLoading}
+              onChange={(e) => setMilestoneId(e.target.value)}
             >
-              <option value="">
-                {projectId ? "This project's milestones" : "All milestones"}
-              </option>
+              <option value="">All milestones</option>
               {milestoneSelectOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -587,10 +582,9 @@ export default function WorkTrackingScreen() {
             </select>
 
             <select
-              className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              className={filterClass}
               value={taskId}
               onChange={(e) => setTaskId(e.target.value)}
-              disabled={optionsLoading}
             >
               <option value="">All tasks</option>
               {taskSelectOptions.map((opt) => (
@@ -601,10 +595,9 @@ export default function WorkTrackingScreen() {
             </select>
 
             <select
-              className="h-10 w-full rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+              className={filterClass}
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              disabled={optionsLoading}
             >
               <option value="">Any status</option>
               {taskStatusSelectOptions.map((opt) => (
@@ -614,20 +607,18 @@ export default function WorkTrackingScreen() {
               ))}
             </select>
 
-            <label className="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 hover:border-gray-300">
+            <label className="flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 hover:border-gray-300 sm:w-[180px]">
               <input
                 type="checkbox"
-                className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-sky-600"
+                className="h-4 w-4"
                 checked={onlyActive}
                 onChange={(e) => setOnlyActive(e.target.checked)}
               />
-              <span className="whitespace-nowrap">Running only</span>
+              Running only
             </label>
 
             <Button
-              type="button"
-              variant="secondary"
-              className="h-9 shrink-0 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 hover:border-gray-300 sm:w-auto"
               onClick={clearFilters}
             >
               Clear Filters
@@ -640,15 +631,13 @@ export default function WorkTrackingScreen() {
         columns={columns}
         data={logs}
         pageSize={10}
-        showPaginationSizeChanger
-        paginationPageSizeOptions={[10, 20, 50]}
         paginationHideOnSinglePage={false}
         visualVariant="employee"
-        cardClassName="items-start justify-start rounded-2xl border border-gray-100 shadow-sm"
+        cardClassName="items-start justify-start overflow-hidden rounded-2xl border border-gray-200 shadow-sm"
         emptyMessage="No work tracking rows match your filters."
         renderers={{
           employee: (row) => (
-            <span className="block max-w-full truncate text-sm text-cs-text">
+            <span className="block max-w-full truncate text-md text-cs-text">
               {row.employee}
             </span>
           ),
@@ -656,7 +645,7 @@ export default function WorkTrackingScreen() {
             <button
               type="button"
               onClick={() => setProjectModalId(row.projectId)}
-              className="max-w-full cursor-pointer truncate text-left text-sm text-blue-600 hover:underline"
+              className="block max-w-full cursor-pointer truncate text-left text-sm  !text-sky-600 !underline decoration-sky-500 underline-offset-2 transition-colors hover:!text-sky-700"
             >
               {row.project}
             </button>
@@ -684,7 +673,7 @@ export default function WorkTrackingScreen() {
                         ? "Timer stopped automatically (e.g. end-of-day cutoff)"
                         : undefined
                 }
-                className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_PILL_CLASS[statusKey]}`}
+                className={`${statusBadgeLayoutClass} max-w-full font-semibold ${STATUS_PILL_CLASS[statusKey]}`}
               >
                 {STATUS_LABEL[statusKey]}
               </span>

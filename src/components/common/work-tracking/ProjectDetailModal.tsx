@@ -50,6 +50,35 @@ function taskStatusLabel(status: string): string {
   }
 }
 
+function statusPillClass(status: string): string {
+  switch (status) {
+    case "ACTIVE":
+    case "IN_PROGRESS":
+      return "bg-blue-100 text-blue-700";
+    case "PAUSED":
+      return "bg-amber-100 text-amber-700";
+    case "COMPLETED":
+    case "ARCHIVED":
+      return "bg-green-100 text-green-700";
+    case "DELAYED":
+      return "bg-rose-100 text-rose-700";
+    case "BLOCKED":
+      return "bg-zinc-200 text-zinc-800";
+    default:
+      return "bg-gray-100 text-gray-600";
+  }
+}
+
+function renderStatusPill(label: string, status: string): ReactNode {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusPillClass(status)}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 async function loadProject(id: number): Promise<ApiProject> {
   try {
     const res = await apiFetch<ApiProject>(`/api/v1/projects/${id}/`, {
@@ -179,7 +208,7 @@ export default function ProjectDetailModal({
         dataIndex: "status",
         key: "status",
         width: 120,
-        render: (s: string) => milestoneStatusLabel(s),
+        render: (s: string) => renderStatusPill(milestoneStatusLabel(s), s),
       },
     ],
     [],
@@ -205,7 +234,7 @@ export default function ProjectDetailModal({
         dataIndex: "status",
         key: "status",
         width: 120,
-        render: (s: string) => taskStatusLabel(s),
+        render: (s: string) => renderStatusPill(taskStatusLabel(s), s),
       },
       {
         title: "Deadline",
@@ -250,9 +279,10 @@ export default function ProjectDetailModal({
       {!loading && project ? (
         <div className="mt-2 space-y-6 text-[15px] leading-relaxed text-gray-800">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
-              {projectStatusLabel(project.status)}
-            </span>
+            {renderStatusPill(
+              projectStatusLabel(project.status),
+              project.status,
+            )}
             <span className="text-sm text-gray-500">
               Start{" "}
               <strong className="text-gray-800">{project.start_date}</strong>

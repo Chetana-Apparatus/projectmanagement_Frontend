@@ -49,12 +49,16 @@ export const allowedTransitions: Record<
 export const statusClassMap: Record<ManagedTaskStatus, string> = {
   "Not Started": "bg-gray-100 text-gray-600",
   "In Progress": "bg-blue-100 text-blue-700",
-  Paused: "bg-violet-100 text-violet-700",
-  Stopped: "bg-slate-200 text-slate-700",
+  Paused: "bg-yellow-100 text-yellow-700",
+  Stopped: "bg-red-100 text-red-700",
   Completed: "bg-green-100 text-green-700",
   Delayed: "bg-rose-100 text-rose-700",
   Blocked: "bg-zinc-200 text-zinc-800",
 };
+
+/** Shared pill layout for all task status badges (use with `statusClassMap`). */
+export const statusBadgeLayoutClass =
+  "inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium leading-none";
 
 export function isTransitionAllowed(
   from: ManagedTaskStatus,

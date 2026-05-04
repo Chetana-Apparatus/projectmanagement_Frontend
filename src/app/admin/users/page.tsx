@@ -10,6 +10,7 @@ import UserTable, {
   type UserRecord,
 } from "@/components/common/users/UserTable";
 import Button from "@/components/ui/Button";
+import { useLoader } from "@/context/LoaderContext";
 import {
   type ApiUser,
   apiUserToRecord,
@@ -21,6 +22,7 @@ import { drfDelete, fetchAllPages } from "@/lib/pms-http";
 
 export default function AdminUsersPage() {
   const { showToast } = useToast();
+  const { setLoading: setGlobalLoading } = useLoader();
 
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -31,15 +33,18 @@ export default function AdminUsersPage() {
   const loadUsers = useCallback(async () => {
     setLoadError(null);
     setLoading(true);
+    setGlobalLoading(true);
     try {
       const rows = await fetchAllPages<ApiUser>("/api/v1/users/");
       setUsers(rows.map(apiUserToRecord));
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load users");
+      showToast("Something went wrong", "error");
     } finally {
       setLoading(false);
+      setGlobalLoading(false);
     }
-  }, []);
+  }, [setGlobalLoading, showToast]);
 
   useEffect(() => {
     void loadUsers();
@@ -65,6 +70,7 @@ export default function AdminUsersPage() {
   };
 
   const handleCreate = async (values: UserFormValues) => {
+    setGlobalLoading(true);
     try {
       const body = userFormToCreateBody(values);
       const res = await postJson<ApiUser>("/api/v1/users/", body);
@@ -76,11 +82,14 @@ export default function AdminUsersPage() {
       await loadUsers();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Create failed", "error");
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
   const handleUpdate = async (values: UserFormValues) => {
     if (!editingUserId) return;
+    setGlobalLoading(true);
     try {
       const body = userFormToPatchBody({
         email: values.email,
@@ -105,17 +114,22 @@ export default function AdminUsersPage() {
       await loadUsers();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Update failed", "error");
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
   const handleDelete = async (u: UserRecord) => {
     if (!confirm(`Remove user ${u.email}?`)) return;
+    setGlobalLoading(true);
     try {
       await drfDelete(`/api/v1/users/${u.id}/`);
       showToast("User deleted", "success");
       await loadUsers();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Delete failed", "error");
+    } finally {
+      setGlobalLoading(false);
     }
   };
 

@@ -1,5 +1,4 @@
 "use client";
-
 import { Dropdown, Modal, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -20,6 +19,7 @@ import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
   type EmployeeManagedTask,
+  statusBadgeLayoutClass,
   statusClassMap,
 } from "@/features/employee-tasks/status";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
@@ -243,7 +243,7 @@ function EmployeeTasksPageContent() {
       onCell: () => ({ style: singleLineCellStyle }),
       render: (_, record) => (
         <span
-          className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${statusClassMap[record.status]}`}
+          className={`${statusBadgeLayoutClass} max-w-full ${statusClassMap[record.status]}`}
         >
           {record.status}
         </span>

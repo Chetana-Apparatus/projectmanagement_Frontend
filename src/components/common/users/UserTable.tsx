@@ -89,11 +89,11 @@ export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
           </StatusBadge>
         ),
         actions: (row) => (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button
               type="button"
               variant="secondary"
-              className="flex h-8 w-8 items-center justify-center border-sky-200 text-sky-600 hover:border-sky-200 hover:bg-sky-50"
+              className="flex h-8 w-8 items-center justify-center border-sky-200 !text-sky-600 hover:border-sky-200 hover:bg-sky-50 hover:!text-sky-700"
               onClick={() => onEdit(row)}
             >
               <Pencil size={16} />
@@ -101,7 +101,7 @@ export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
             <Button
               type="button"
               variant="secondary"
-              className="flex h-8 w-8 items-center justify-center border-red-200 text-red-600 hover:border-red-200 hover:bg-red-50"
+              className="flex h-8 w-8 items-center justify-center border-red-200 !text-red-600 hover:border-red-200 hover:bg-red-50 hover:!text-red-700"
               onClick={() => onDelete(row)}
             >
               <Trash2 size={16} />

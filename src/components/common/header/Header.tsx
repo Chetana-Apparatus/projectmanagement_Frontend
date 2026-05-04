@@ -37,7 +37,6 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
   const router = useRouter();
   const logout = useLogout();
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -55,7 +54,6 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Sync user data
   useEffect(() => {
     const syncUserProfile = () => {
       const storedName = localStorage.getItem(USER_NAME_KEY);
@@ -88,9 +86,7 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
           "User";
         setUserName(fullName);
         localStorage.setItem(USER_NAME_KEY, fullName);
-      } catch {
-        // keep local fallback
-      }
+      } catch {}
     };
     void loadCurrentUser();
   }, []);
@@ -104,9 +100,7 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
       if (res.success && res.data?.results) {
         setNotifications(res.data.results);
       }
-    } catch {
-      // silent in header
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -146,7 +140,6 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
         ${collapsed ? "lg:left-[80px]" : "lg:left-[240px]"}
       `}
     >
-      {/* LEFT SECTION */}
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -157,9 +150,7 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
         </button>
       </div>
 
-      {/* RIGHT SECTION */}
       <div className="flex items-center gap-2 pr-1">
-        {/* Notification */}
         <div className="relative" ref={notificationRef}>
           <button
             type="button"
@@ -209,11 +200,11 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
                           <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-transparent" />
                         )}
                         <div>
-                          <p className="text-sm font-medium text-cs-heading">
+                          <p className="p1 font-medium text-cs-heading">
                             {n.title}
                           </p>
                           {n.message ? (
-                            <p className="text-xs text-cs-text">{n.message}</p>
+                            <p className="p1 text-cs-text">{n.message}</p>
                           ) : null}
                         </div>
                       </div>
@@ -230,7 +221,7 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
-            className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-cs-primary-100/10"
+            className="flex items-center rounded-lg px-2 py-1 hover:bg-cs-primary-100/10"
           >
             {/* Avatar */}
             <div className="h-8 w-8 rounded-full bg-cs-primary-100/30 overflow-hidden flex items-center justify-center">
@@ -248,11 +239,11 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
             </div>
 
             {/* Name + Role */}
-            <div className="hidden sm:flex flex-col leading-none">
+            <div className="hidden min-w-0 sm:flex flex-col leading-none">
               <p className="text-sm font-semibold text-cs-heading whitespace-nowrap">
                 {userName}
               </p>
-              <p className="text-[11px] text-cs-text mt-[2px] whitespace-nowrap">
+              <p className="mt-0.5 text-[11px] text-cs-text whitespace-nowrap">
                 {roleLabel[role]}
               </p>
             </div>
