@@ -28,6 +28,10 @@ import type {
   ApiUser,
 } from "@/lib/admin-mappers";
 import { fetchAllPages } from "@/lib/pms-http";
+import {
+  buildLatestActivityByTaskId,
+  type RecentActivityAction,
+} from "@/lib/recent-activity";
 
 export type WorkLogUiStatus =
   | "not-started"
@@ -80,13 +84,19 @@ const STATUS_PILL_CLASS: Record<WorkLogUiStatus, string> = {
   blocked: "bg-zinc-200 text-zinc-800 ring-0 shadow-none",
 };
 
-function resolveWorkRowStatus(rec: WorkTrackingRecord): WorkLogUiStatus {
+function resolveWorkRowStatus(
+  rec: WorkTrackingRecord,
+  latestAction?: RecentActivityAction,
+): WorkLogUiStatus {
   const ts = (rec.task_status ?? "").toUpperCase();
   const timer = rec.timer_state ?? "";
   const lastStop = rec.last_stop_source ?? "";
   if (ts === "COMPLETED") return "completed";
   if (ts === "DELAYED") return "delayed";
   if (ts === "BLOCKED") return "blocked";
+  if (latestAction === "STOPPED" && (timer === "PAUSED" || ts === "PAUSED")) {
+    return "stopped";
+  }
   if (timer === "STARTED") return "running";
   if (timer === "PAUSED") return "paused";
   if (timer === "AUTO_STOPPED") return "auto-stopped";
@@ -170,7 +180,11 @@ function buildFilterQuery(f: {
   };
 }
 
-function mapRecord(rec: WorkTrackingRecord): WorkLogRow {
+function mapRecord(
+  rec: WorkTrackingRecord,
+  latestByTask: Partial<Record<string, RecentActivityAction>>,
+): WorkLogRow {
+  const latest = latestByTask[String(rec.task_id)];
   return {
     id: String(rec.task_id),
     employee: rec.employee_name,
@@ -178,7 +192,7 @@ function mapRecord(rec: WorkTrackingRecord): WorkLogRow {
     project: rec.project_name,
     milestone: rec.milestone_name ?? "—",
     task: rec.task_title,
-    status: resolveWorkRowStatus(rec),
+    status: resolveWorkRowStatus(rec, latest),
     sessionStart: formatSessionStart(rec),
     historyDetail: buildHistoryDetail(rec),
     workingTime: rec.total_time_spent_display ?? "—",
@@ -309,7 +323,10 @@ export default function WorkTrackingScreen() {
         completed: s.completed_count ?? 0,
         autoStopped: s.auto_stopped_count ?? 0,
       });
-      setLogs((data.work_tracking ?? []).map(mapRecord));
+      const latestByTask = buildLatestActivityByTaskId(data.recent_activity);
+      setLogs(
+        (data.work_tracking ?? []).map((rec) => mapRecord(rec, latestByTask)),
+      );
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load");
     } finally {

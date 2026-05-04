@@ -24,6 +24,8 @@ import {
   fetchWorkTracking,
   type WorkTrackingPayload,
 } from "@/lib/admin-dashboard-api";
+import { buildLatestActivityByTaskId } from "@/lib/recent-activity";
+import { liveWorkStatusFromRecord } from "@/lib/work-tracking-display";
 
 /* ================= TYPES ================= */
 
@@ -124,6 +126,7 @@ function mapProjectsToOverview(
 
 function mapWorkTracking(
   rows: WorkTrackingPayload["work_tracking"],
+  latestByTask: ReturnType<typeof buildLatestActivityByTaskId>,
 ): WorkTrackingRow[] {
   if (!rows?.length) return [];
   return rows
@@ -132,15 +135,8 @@ function mapWorkTracking(
       if (taskStatus === "COMPLETED" || taskStatus === "NOT_STARTED") {
         return null;
       }
-      const ts = row.timer_state ?? "";
-      const status: WorkTrackingRow["status"] =
-        ts === "STARTED"
-          ? "Running"
-          : ts === "PAUSED"
-            ? "Paused"
-            : ts === "AUTO_STOPPED"
-              ? "Auto stop"
-              : "Stopped";
+      const latest = latestByTask[String(row.task_id)];
+      const status = liveWorkStatusFromRecord(row, latest);
       return {
         id: `wk-${idx}-${row.task_title}`,
         employee: row.employee_name,
@@ -213,7 +209,8 @@ export default function AdminDashboardPage() {
       });
 
       setProjectRows(mapProjectsToOverview(dash));
-      setWorkTracking(mapWorkTracking(work.work_tracking));
+      const latestByTask = buildLatestActivityByTaskId(work.recent_activity);
+      setWorkTracking(mapWorkTracking(work.work_tracking, latestByTask));
       setActivityItems(mapNotificationsToActivity(work.recent_activity));
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load dashboard");

@@ -12,6 +12,10 @@ import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailM
 import Button from "@/components/ui/Button";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import {
+  fetchWorkTracking,
+  type WorkTrackingPayload,
+} from "@/lib/admin-dashboard-api";
+import {
   type ApiMilestone,
   type ApiProject,
   type ApiTask,
@@ -25,6 +29,7 @@ import {
   drfFormDataPost,
   fetchAllPages,
 } from "@/lib/pms-http";
+import { buildLatestActivityByTaskId } from "@/lib/recent-activity";
 import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
 function AdminTasksPageContent() {
@@ -61,12 +66,17 @@ function AdminTasksPageContent() {
     setLoadError(null);
     setLoading(true);
     try {
-      const [userRows, projectRows, milestoneRows, taskRows] =
+      const [userRows, projectRows, milestoneRows, taskRows, workActivity] =
         await Promise.all([
           fetchAllPages<ApiUser>("/api/v1/users/"),
           fetchAllPages<ApiProject>("/api/v1/projects/"),
           fetchAllPages<ApiMilestone>("/api/v1/milestones/"),
           fetchAllPages<ApiTask>("/api/v1/tasks/"),
+          fetchWorkTracking().catch(
+            (): WorkTrackingPayload => ({
+              recent_activity: [],
+            }),
+          ),
         ]);
 
       const names: Record<string, string> = {};
@@ -104,7 +114,12 @@ function AdminTasksPageContent() {
         })),
       );
 
-      setTasks(taskRows.map(apiTaskToRow));
+      const latestByTask = buildLatestActivityByTaskId(
+        workActivity.recent_activity,
+      );
+      setTasks(
+        taskRows.map((t) => apiTaskToRow(t, latestByTask[String(t.id)])),
+      );
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load tasks");
     } finally {

@@ -3,6 +3,8 @@ import type { Project } from "@/components/common/projects/ProjectTable";
 import type { TaskFormValues } from "@/components/common/tasks/TaskForm";
 import type { Task, TaskProgress } from "@/components/common/tasks/TaskTable";
 import type { UserRecord } from "@/components/common/users/UserTable";
+import type { RecentActivityAction } from "@/lib/recent-activity";
+import { isAutoStopLastSource } from "@/lib/work-tracking-display";
 
 /** --- Users --- */
 
@@ -373,6 +375,8 @@ export type ApiTask = {
   planned_hours?: number | null;
   /** Present when assignee has an active TimeLog (timer running). */
   timer_state?: string | null;
+  /** When `timer_state` is `STOPPED`, distinguishes manual vs backend auto-stop. */
+  last_stop_source?: string | null;
 };
 
 function taskDeadlineYmd(deadline: string | null | undefined): string | null {
@@ -381,17 +385,41 @@ function taskDeadlineYmd(deadline: string | null | undefined): string | null {
 }
 
 /** Progress column: timer + status + overdue (expected date < today, not complete). */
-export function deriveTaskProgress(t: ApiTask): TaskProgress {
+export function deriveTaskProgress(
+  t: ApiTask,
+  latestActivity?: RecentActivityAction,
+): TaskProgress {
   const ymd = taskDeadlineYmd(t.deadline ?? null);
   const today = new Date().toISOString().split("T")[0];
   const overdue = Boolean(ymd && ymd < today && t.status !== "COMPLETED");
   if (overdue || t.status === "DELAYED") return "Delayed";
   if (t.status === "COMPLETED") return "Complete";
-  const timer = t.timer_state;
+  const timer = t.timer_state ?? "";
+  const lastStop = t.last_stop_source;
+
+  /* Backend maps stop to PAUSED; latest activity confirms STOPPED (EmployeeTasksProvider). */
+  if (
+    latestActivity === "STOPPED" &&
+    (t.status === "PAUSED" || timer === "PAUSED")
+  ) {
+    return "Stopped";
+  }
+
   if (timer === "STARTED") return "Running";
   if (timer === "PAUSED") return "Paused";
   if (timer === "AUTO_STOPPED") return "Auto stop";
-  if (timer === "STOPPED") return "Stopped";
+  if (timer === "STOPPED") {
+    return isAutoStopLastSource(lastStop) ? "Auto stop" : "Stopped";
+  }
+  /* Auto-stop may clear `timer_state` but keep last_stop_source + task still PAUSED in DB */
+  if (
+    !timer &&
+    isAutoStopLastSource(lastStop) &&
+    t.status !== "COMPLETED" &&
+    t.status !== "NOT_STARTED"
+  ) {
+    return "Auto stop";
+  }
   /* Fallback when API omits timer_state */
   if (t.status === "PAUSED") return "Paused";
   if (t.status === "IN_PROGRESS") return "Stopped";
@@ -438,7 +466,10 @@ function uiTaskStatusToApi(s: Task["status"]): string {
   }
 }
 
-export function apiTaskToRow(t: ApiTask): Task {
+export function apiTaskToRow(
+  t: ApiTask,
+  latestActivity?: RecentActivityAction,
+): Task {
   const created = t.created_at?.split("T")[0] ?? "";
   const deadline = t.deadline ?? "";
   return {
@@ -452,7 +483,7 @@ export function apiTaskToRow(t: ApiTask): Task {
     startDate: created,
     expectedDate: deadline,
     status: apiTaskStatusToUi(t.status),
-    progress: deriveTaskProgress(t),
+    progress: deriveTaskProgress(t, latestActivity),
     progressPercent:
       typeof t.progress_percent === "number" ? t.progress_percent : 0,
   };
