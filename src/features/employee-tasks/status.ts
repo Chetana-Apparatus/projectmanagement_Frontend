@@ -29,6 +29,8 @@ export type EmployeeManagedTask = {
   assignedBy: string;
   documents: TaskDocument[];
   lastInteractionAt: number;
+  /** Work-tracking progress 0–100 from API. */
+  progressPercent: number;
 };
 
 export const allowedTransitions: Record<

@@ -42,6 +42,8 @@ type EmployeeTaskApi = {
   created_at?: string;
   deadline?: string | null;
   document?: string | null;
+  progress_percent?: number | null;
+  planned_hours?: number | null;
 };
 
 type ActivityItem = {
@@ -121,6 +123,8 @@ export function EmployeeTasksProvider({
         assignedBy: task.created_by_name ?? task.assigned_to_name ?? "-",
         documents,
         lastInteractionAt: Date.now(),
+        progressPercent:
+          typeof task.progress_percent === "number" ? task.progress_percent : 0,
       };
     },
     [],

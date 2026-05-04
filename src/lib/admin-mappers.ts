@@ -309,7 +309,7 @@ export function apiProjectToRow(p: ApiProject): Project {
     documentName: fileNameFromPath(p.document),
     status: statusLabel,
     progressPercent:
-      typeof p.progress_percent === "number" ? p.progress_percent : null,
+      typeof p.progress_percent === "number" ? p.progress_percent : 0,
   };
 }
 
@@ -346,7 +346,7 @@ export function apiMilestoneToRecord(m: ApiMilestone): MilestoneRecord {
     expectedDate: m.end_date,
     status: milestoneStatus,
     progressPercent:
-      typeof m.progress_percent === "number" ? m.progress_percent : null,
+      typeof m.progress_percent === "number" ? m.progress_percent : 0,
     assignedEmployees: [],
     watchers: [],
   };
@@ -368,6 +368,9 @@ export type ApiTask = {
   status: string;
   deadline?: string | null;
   created_at?: string;
+  /** Work-tracking progress 0–100 from backend. */
+  progress_percent?: number | null;
+  planned_hours?: number | null;
   /** Present when assignee has an active TimeLog (timer running). */
   timer_state?: string | null;
 };
@@ -384,7 +387,12 @@ export function deriveTaskProgress(t: ApiTask): TaskProgress {
   const overdue = Boolean(ymd && ymd < today && t.status !== "COMPLETED");
   if (overdue || t.status === "DELAYED") return "Delayed";
   if (t.status === "COMPLETED") return "Complete";
-  if (t.timer_state === "STARTED") return "Running";
+  const timer = t.timer_state;
+  if (timer === "STARTED") return "Running";
+  if (timer === "PAUSED") return "Paused";
+  if (timer === "AUTO_STOPPED") return "Auto stop";
+  if (timer === "STOPPED") return "Stopped";
+  /* Fallback when API omits timer_state */
   if (t.status === "PAUSED") return "Paused";
   if (t.status === "IN_PROGRESS") return "Stopped";
   if (t.status === "BLOCKED") return "Stopped";
@@ -445,6 +453,8 @@ export function apiTaskToRow(t: ApiTask): Task {
     expectedDate: deadline,
     status: apiTaskStatusToUi(t.status),
     progress: deriveTaskProgress(t),
+    progressPercent:
+      typeof t.progress_percent === "number" ? t.progress_percent : 0,
   };
 }
 

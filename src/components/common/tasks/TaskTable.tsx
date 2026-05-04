@@ -11,6 +11,7 @@ export type TaskProgress =
   | "Running"
   | "Paused"
   | "Stopped"
+  | "Auto stop"
   | "Complete"
   | "Delayed";
 
@@ -34,6 +35,8 @@ export type Task = {
     | "Delayed";
   /** Derived progress for the table (timer + status + overdue). */
   progress: TaskProgress;
+  /** Work-tracking progress from API (0–100). */
+  progressPercent: number;
 };
 
 type TaskTableProps = {
@@ -61,16 +64,28 @@ export default function TaskTable({
 }: TaskTableProps) {
   const progressBadge = (progress: TaskProgress) => {
     const styleMap: Record<TaskProgress, string> = {
-      Complete: "bg-green-100 text-green-700",
-      Running: "bg-blue-100 text-blue-700",
-      Paused: "bg-violet-100 text-violet-700",
-      Stopped: "bg-slate-200 text-slate-700",
-      "Not Started": "bg-gray-100 text-gray-600",
-      Delayed: "bg-rose-100 text-rose-700",
+      Complete: "bg-green-100 text-green-700 ring-0 shadow-none",
+      Running: "bg-blue-100 text-blue-700 ring-0 shadow-none",
+      Paused: "bg-violet-100 text-violet-700 ring-0 shadow-none",
+      Stopped:
+        "border border-amber-400 bg-amber-50 text-amber-950 shadow-sm shadow-amber-200/50",
+      "Auto stop":
+        "border border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm shadow-indigo-200/40",
+      "Not Started": "bg-gray-100 text-gray-600 ring-0 shadow-none",
+      Delayed: "bg-rose-100 text-rose-700 ring-0 shadow-none",
     };
     return (
       <span
-        className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${styleMap[progress]}`}
+        title={
+          progress === "Paused"
+            ? "Employee paused the timer (can resume)"
+            : progress === "Stopped"
+              ? "Employee stopped the timer"
+              : progress === "Auto stop"
+                ? "Timer stopped automatically (e.g. end-of-day cutoff)"
+                : undefined
+        }
+        className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${styleMap[progress]}`}
       >
         {progress}
       </span>

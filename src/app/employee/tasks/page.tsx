@@ -23,6 +23,7 @@ import {
   statusClassMap,
 } from "@/features/employee-tasks/status";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
+import { clampProgress, formatProgressLabel } from "@/lib/progress-display";
 
 const singleLineHeaderStyle: CSSProperties = { whiteSpace: "nowrap" };
 const singleLineCellStyle: CSSProperties = {
@@ -213,6 +214,25 @@ function EmployeeTasksPageContent() {
           {value}
         </span>
       ),
+    },
+    {
+      title: "Progress",
+      key: "progressPercent",
+      width: 90,
+      align: "center",
+      onHeaderCell: () => ({ style: singleLineHeaderStyle }),
+      onCell: () => ({ style: singleLineCellStyle }),
+      render: (_, record) => {
+        const raw = clampProgress(record.progressPercent);
+        if (raw <= 0) {
+          return <span className="text-sm text-gray-500">—</span>;
+        }
+        return (
+          <span className="text-sm font-medium tabular-nums text-cs-text">
+            {formatProgressLabel(raw)}
+          </span>
+        );
+      },
     },
     {
       title: "Status",

@@ -36,6 +36,8 @@ type DataTableProps<T extends Record<string, unknown>> = {
   /** Match employee task table: gray header row, body typography, row hover. */
   visualVariant?: DataTableVisualVariant;
   cardClassName?: string;
+  /** Extra Tailwind classes per row (e.g. accent stopped tasks in admin Tasks). */
+  resolveRowExtraClass?: (row: T) => string | null | undefined | false;
 };
 
 export default function DataTable<T extends Record<string, unknown>>({
@@ -52,6 +54,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   paginationHideOnSinglePage = true,
   visualVariant = "default",
   cardClassName,
+  resolveRowExtraClass,
 }: DataTableProps<T>) {
   const tableColumns = useMemo<TableColumnsType<T>>(
     () =>
@@ -143,16 +146,21 @@ export default function DataTable<T extends Record<string, unknown>>({
         rowKey={(row) =>
           String((row as { id?: string | number }).id ?? JSON.stringify(row))
         }
-        rowClassName={(row) => {
-          const id = String((row as { id?: string | number }).id ?? "");
-          const hl =
-            id && highlightRowId && id === highlightRowId
-              ? "!bg-sky-100/90 transition-colors duration-300"
-              : "";
-          const hover =
-            visualVariant === "employee" ? "hover:!bg-gray-50/60" : "";
-          return [hl, hover].filter(Boolean).join(" ");
-        }}
+        rowClassName={(row) =>
+          cn(
+            (() => {
+              const id = String((row as { id?: string | number }).id ?? "");
+              const hl =
+                id && highlightRowId && id === highlightRowId
+                  ? "!bg-sky-100/90 transition-colors duration-300"
+                  : "";
+              const hover =
+                visualVariant === "employee" ? "hover:!bg-gray-50/60" : "";
+              return cn(hl, hover);
+            })(),
+            resolveRowExtraClass?.(row),
+          )
+        }
         columns={tableColumns}
         dataSource={data}
         tableLayout="fixed"

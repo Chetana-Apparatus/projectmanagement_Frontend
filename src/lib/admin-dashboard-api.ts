@@ -60,7 +60,7 @@ export type WorkTrackingRecord = {
   task_id: number;
   task_title: string;
   task_status?: string;
-  timer_state: string;
+  timer_state?: string | null;
   current_session_start_time?: string | null;
   current_session_seconds?: number;
   current_session_display?: string;

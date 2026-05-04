@@ -56,22 +56,27 @@ const STATUS_LABEL: Record<WorkLogUiStatus, string> = {
   running: "Running",
   paused: "Paused",
   stopped: "Stopped",
-  "auto-stopped": "Stopped (auto 8pm)",
+  "auto-stopped": "Auto stop",
   completed: "Complete",
   delayed: "Delayed",
   blocked: "Blocked",
 };
 
-/** Status pills aligned with employee task table (`statusClassMap`). */
+/** Manual stop (amber). Auto stop uses indigo to match Admin Tasks. */
+const STOPPED_BADGE_CLASS =
+  "border border-amber-400 bg-amber-50 text-amber-950 shadow-sm shadow-amber-200/50";
+const AUTO_STOP_BADGE_CLASS =
+  "border border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm shadow-indigo-200/40";
+
 const STATUS_PILL_CLASS: Record<WorkLogUiStatus, string> = {
-  "not-started": "bg-gray-100 text-gray-600",
-  running: "bg-blue-100 text-blue-700",
-  paused: "bg-violet-100 text-violet-700",
-  stopped: "bg-slate-200 text-slate-700",
-  "auto-stopped": "bg-indigo-100 text-indigo-700",
-  completed: "bg-green-100 text-green-700",
-  delayed: "bg-rose-100 text-rose-700",
-  blocked: "bg-zinc-200 text-zinc-800",
+  "not-started": "bg-gray-100 text-gray-600 ring-0 shadow-none",
+  running: "bg-blue-100 text-blue-700 ring-0 shadow-none",
+  paused: "bg-violet-100 text-violet-700 ring-0 shadow-none",
+  stopped: STOPPED_BADGE_CLASS,
+  "auto-stopped": AUTO_STOP_BADGE_CLASS,
+  completed: "bg-green-100 text-green-700 ring-0 shadow-none",
+  delayed: "bg-rose-100 text-rose-700 ring-0 shadow-none",
+  blocked: "bg-zinc-200 text-zinc-800 ring-0 shadow-none",
 };
 
 function resolveWorkRowStatus(rec: WorkTrackingRecord): WorkLogUiStatus {
@@ -83,6 +88,7 @@ function resolveWorkRowStatus(rec: WorkTrackingRecord): WorkLogUiStatus {
   if (ts === "BLOCKED") return "blocked";
   if (timer === "STARTED") return "running";
   if (timer === "PAUSED") return "paused";
+  if (timer === "AUTO_STOPPED") return "auto-stopped";
   if (ts === "NOT_STARTED") return "not-started";
   if (timer === "STOPPED") {
     if (lastStop === "AUTO_STOP_8PM") return "auto-stopped";
@@ -669,7 +675,16 @@ export default function WorkTrackingScreen() {
             const statusKey = row.status;
             return (
               <span
-                className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${STATUS_PILL_CLASS[statusKey]}`}
+                title={
+                  statusKey === "paused"
+                    ? "Employee paused the timer (can resume)"
+                    : statusKey === "stopped"
+                      ? "Employee stopped the timer"
+                      : statusKey === "auto-stopped"
+                        ? "Timer stopped automatically (e.g. end-of-day cutoff)"
+                        : undefined
+                }
+                className={`inline-flex max-w-full justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_PILL_CLASS[statusKey]}`}
               >
                 {STATUS_LABEL[statusKey]}
               </span>

@@ -9,6 +9,7 @@ import DataTable, {
 } from "@/components/common/table/DataTable";
 import Button from "@/components/ui/Button";
 import { getPublicApiOrigin } from "@/lib/api-base";
+import { formatProgressLabel, progressBarValue } from "@/lib/progress-display";
 export type ProjectStatus =
   | "Not Started"
   | "In Progress"
@@ -53,26 +54,15 @@ export default function ProjectTable({
   };
 
   const progressBar = (row: Project) => {
-    const fromStatus =
-      row.status === "Completed"
-        ? 100
-        : row.status === "In Progress"
-          ? 75
-          : row.status === "Delayed"
-            ? 50
-            : 25;
-    const percent =
-      typeof row.progressPercent === "number"
-        ? Math.max(0, Math.min(100, Math.round(row.progressPercent)))
-        : fromStatus;
+    const raw = progressBarValue(row.progressPercent);
     return (
       <div className="mx-auto w-[160px]">
         <Progress
-          percent={percent}
+          percent={raw}
           size="small"
-          strokeColor={progressColor(percent)}
+          strokeColor={progressColor(row.progressPercent ?? 0)}
           trailColor="#e5e7eb"
-          format={(value) => `${value ?? 0}%`}
+          format={() => formatProgressLabel(row.progressPercent)}
         />
       </div>
     );

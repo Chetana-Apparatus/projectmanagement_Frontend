@@ -6,6 +6,7 @@ import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
 import Button from "@/components/ui/Button";
+import { formatProgressLabel, progressBarValue } from "@/lib/progress-display";
 
 export type MilestoneRecord = {
   id: string;
@@ -21,7 +22,8 @@ export type MilestoneRecord = {
     | "Delayed"
     | "Paused"
     | "Blocked";
-  progressPercent: number | null;
+  /** 0–100 from API work-tracking rollup; 0 when unknown. */
+  progressPercent: number;
   assignedEmployees: string[];
   watchers: string[];
 };
@@ -43,32 +45,22 @@ export default function MilestoneTable({
   highlightRowId = null,
   onOpenProjectAction,
 }: MilestoneTableProps) {
-  const getProgressValue = (status: MilestoneRecord["status"]) => {
-    if (status === "Completed") return 100;
-    if (status === "In Progress") return 75;
-    if (status === "Delayed" || status === "Paused") return 50;
-    return 25;
-  };
-
   const getProgressColor = (value: number) => {
-    if (value > 75) return "#16a34a"; // green: > 75
-    if (value > 50) return "#2563eb"; // blue: 51-75
-    return "#dc2626"; // red: 0-50
+    if (value > 75) return "#16a34a";
+    if (value > 50) return "#2563eb";
+    return "#dc2626";
   };
 
   const progressBar = (row: MilestoneRecord) => {
-    const percent =
-      typeof row.progressPercent === "number"
-        ? Math.max(0, Math.min(100, Math.round(row.progressPercent)))
-        : getProgressValue(row.status);
+    const raw = progressBarValue(row.progressPercent);
     return (
       <div className="mx-auto w-[160px]">
         <Progress
-          percent={percent}
+          percent={raw}
           size="small"
-          strokeColor={getProgressColor(percent)}
+          strokeColor={getProgressColor(row.progressPercent)}
           trailColor="#e5e7eb"
-          format={(value) => `${value ?? 0}%`}
+          format={() => formatProgressLabel(row.progressPercent)}
         />
       </div>
     );
