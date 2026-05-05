@@ -131,6 +131,19 @@ export async function drfFormDataPost<T>(
   return readDrfJson<T>(res);
 }
 
+/** POST each file to `POST /api/v1/files/` with `project` id (.docx / .md only enforced by API). */
+export async function uploadProjectDocumentFiles(
+  projectId: number,
+  files: File[],
+): Promise<void> {
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("project", String(projectId));
+    await drfFormDataPost<unknown>("/api/v1/files/", fd);
+  }
+}
+
 export async function drfFormDataPatch<T>(
   path: string,
   formData: FormData,

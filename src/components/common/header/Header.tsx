@@ -203,8 +203,21 @@ const Header = ({ role, collapsed, onToggleMobileSidebar }: HeaderProps) => {
                           <p className="p1 font-medium text-cs-heading">
                             {n.title}
                           </p>
+                          {(n.type === "TASK_DEADLINE_CHANGE_REQUEST" ||
+                            n.type === "PROJECT_DEADLINE_CHANGE_REQUEST") &&
+                          n.details &&
+                          (n.details.deadline_from != null ||
+                            n.details.deadline_to != null) ? (
+                            <p className="mt-0.5 text-xs font-semibold text-amber-900">
+                              Deadline change:{" "}
+                              {n.details.deadline_from ?? "none"} →{" "}
+                              {n.details.deadline_to ?? "none"}
+                            </p>
+                          ) : null}
                           {n.message ? (
-                            <p className="p1 text-cs-text">{n.message}</p>
+                            <p className="p1 whitespace-pre-wrap break-words text-cs-text">
+                              {n.message}
+                            </p>
                           ) : null}
                         </div>
                       </div>

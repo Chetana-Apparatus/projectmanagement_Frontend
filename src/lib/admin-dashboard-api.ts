@@ -162,6 +162,11 @@ export type NotificationRow = {
   is_read?: boolean;
   ref_type?: string;
   ref_id?: number;
+  /** Present for deadline-change notifications: structured from/to dates (ISO YYYY-MM-DD or null). */
+  details?: {
+    deadline_from?: string | null;
+    deadline_to?: string | null;
+  } | null;
 };
 
 /** Paginated list (`StandardResultsSetPagination`). */

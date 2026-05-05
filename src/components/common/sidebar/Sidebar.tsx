@@ -75,9 +75,12 @@ export default function Sidebar({
 
         <nav className="space-y-1 p-3">
           {items.map((item) => {
-            const isDashboardRoot = item.href === "/business-analyst";
-            const isActive = isDashboardRoot
-              ? pathname === item.href
+            /** Avoid marking "Dashboard" active on sibling routes (e.g. /employee/tasks). */
+            const isDashboardRootLink =
+              item.href === "/business-analyst" || item.href === "/employee";
+            const isActive = isDashboardRootLink
+              ? pathname === item.href ||
+                pathname === `${item.href}/dashboard`
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
 

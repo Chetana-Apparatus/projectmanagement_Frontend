@@ -165,13 +165,16 @@ function devTypeToDepartment(
   return t.trim() as "FRONTEND" | "BACKEND" | "FULLSTACK" | "";
 }
 
-const TECH_TO_API: Record<string, string> = {
-  "Next.js": "NEXTJS",
-  React: "REACT",
-  Python: "PYTHON",
-  Java: "JAVA",
-  NestJS: "NESTJS",
-};
+function firstTechStackValue(techStack: string[], techOther: string): string {
+  const direct = techStack.map((item) => item.trim()).find(Boolean);
+  if (direct) return direct;
+  return (
+    techOther
+      .split(/\r?\n|,/)
+      .map((item) => item.replace(/^\d+[).\-\s]+/, "").trim())
+      .find(Boolean) ?? ""
+  );
+}
 
 export function userFormToCreateBody(values: {
   email: string;
@@ -187,25 +190,11 @@ export function userFormToCreateBody(values: {
   const role = displayRoleToApi(values.role);
   const experience_level = designationToExp(values.designation);
   const department = devTypeToDepartment(values.developerType);
-  let tech_stack = "";
-  for (const t of values.techStack) {
-    const normalized = t.trim();
-    if (!normalized) continue;
-    if (TECH_TO_API[normalized]) {
-      tech_stack = TECH_TO_API[normalized];
-      break;
-    }
-    tech_stack = normalized;
-    break;
-  }
+  const tech_stack = firstTechStackValue(values.techStack, values.techOther);
   const tech_notes =
     role === "EMPLOYEE"
       ? buildTechNotes(values.techStack, values.techOther)
       : "";
-  const hasEmpTech = values.techStack.length > 0 || !!values.techOther.trim();
-  if (role === "EMPLOYEE" && hasEmpTech && !tech_stack) {
-    tech_stack = "PYTHON";
-  }
 
   return {
     email: values.email.trim(),
@@ -216,10 +205,7 @@ export function userFormToCreateBody(values: {
     status: "ACTIVE",
     experience_level: role === "EMPLOYEE" ? experience_level : "",
     department: role === "EMPLOYEE" ? department : "",
-    tech_stack:
-      role === "EMPLOYEE"
-        ? tech_stack || (tech_notes.trim() ? "PYTHON" : "")
-        : "",
+    tech_stack: role === "EMPLOYEE" ? tech_stack : "",
     tech_notes: role === "EMPLOYEE" ? tech_notes : "",
   };
 }
@@ -238,17 +224,7 @@ export function userFormToPatchBody(values: {
   const role = displayRoleToApi(values.role);
   const experience_level = designationToExp(values.designation);
   const department = devTypeToDepartment(values.developerType);
-  let tech_stack = "";
-  for (const t of values.techStack) {
-    const normalized = t.trim();
-    if (!normalized) continue;
-    if (TECH_TO_API[normalized]) {
-      tech_stack = TECH_TO_API[normalized];
-      break;
-    }
-    tech_stack = normalized;
-    break;
-  }
+  const tech_stack = firstTechStackValue(values.techStack, values.techOther);
   const tech_notes =
     role === "EMPLOYEE"
       ? buildTechNotes(values.techStack, values.techOther)
@@ -262,10 +238,7 @@ export function userFormToPatchBody(values: {
     status: "ACTIVE",
     experience_level: role === "EMPLOYEE" ? experience_level : "",
     department: role === "EMPLOYEE" ? department : "",
-    tech_stack:
-      role === "EMPLOYEE"
-        ? tech_stack || (tech_notes.trim() ? "PYTHON" : "")
-        : "",
+    tech_stack: role === "EMPLOYEE" ? tech_stack : "",
     tech_notes: role === "EMPLOYEE" ? tech_notes : "",
   };
   if (values.password?.trim()) {
@@ -284,6 +257,8 @@ export type ApiProject = {
   deadline: string;
   status: string;
   document?: string | null;
+  /** Total files: main project document (if any) + file attachments */
+  documents_count?: number;
   progress_percent?: number | null;
 };
 
@@ -309,6 +284,12 @@ export function apiProjectToRow(p: ApiProject): Project {
     expectedDate: p.deadline,
     documentUrl: p.document ?? null,
     documentName: fileNameFromPath(p.document),
+    documentsCount:
+      typeof p.documents_count === "number"
+        ? p.documents_count
+        : p.document
+          ? 1
+          : 0,
     status: statusLabel,
     progressPercent:
       typeof p.progress_percent === "number" ? p.progress_percent : 0,

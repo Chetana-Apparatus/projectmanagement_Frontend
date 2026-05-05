@@ -35,6 +35,7 @@ type EmployeeTaskApi = {
   project_id?: number | string | null;
   project_name?: string;
   project_document?: string | null;
+  project_files?: { id: number; file: string }[];
   milestone_name?: string | null;
   milestone_document?: string | null;
   title: string;
@@ -100,12 +101,23 @@ export function EmployeeTasksProvider({
 
   const buildManagedTask = useCallback(
     (task: EmployeeTaskApi): EmployeeManagedTask => {
+      const projectFilePaths = (task.project_files ?? [])
+        .map((row) => row.file)
+        .filter((doc): doc is string => Boolean(doc));
       const documents = [
         task.project_document,
+        ...projectFilePaths,
         task.milestone_document,
         task.document,
       ]
         .filter((doc): doc is string => Boolean(doc))
+        .filter((doc, index, list) => {
+          const withoutQuery = doc.split("?")[0];
+          return (
+            list.findIndex((item) => item.split("?")[0] === withoutQuery) ===
+            index
+          );
+        })
         .map((doc) => ({
           name: fileNameFromPath(doc),
           url: doc,
@@ -196,7 +208,7 @@ export function EmployeeTasksProvider({
           id: `${item.task_id}-${item.timestamp}-${idx}`,
           taskId: String(item.task_id),
           action: item.action,
-          description: `${item.employee_name} ${item.action.toLowerCase()} task "${item.task_title}" in ${item.project_name}`,
+          description: `You ${item.action.toLowerCase()} task "${item.task_title}" in ${item.project_name}`,
           time: new Date(item.timestamp).toLocaleString(),
         }));
       setRecentActivity(normalizedActivity);

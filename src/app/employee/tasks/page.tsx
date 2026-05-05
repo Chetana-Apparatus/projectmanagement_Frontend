@@ -1,5 +1,4 @@
 "use client";
-import type { MenuProps } from "antd";
 import { Dropdown, Modal, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -12,7 +11,8 @@ import {
   PlayCircle,
   StopCircle,
 } from "lucide-react";
-import { type CSSProperties, Suspense, useState } from "react";
+import { type CSSProperties, type ReactNode, Suspense, useState } from "react";
+import Card from "@/components/common/card/Card";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
@@ -23,7 +23,8 @@ import {
   statusClassMap,
 } from "@/features/employee-tasks/status";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
-import { cn } from "@/lib/utils";
+import { getPublicApiOrigin } from "@/lib/api-base";
+import { clampProgress, formatProgressLabel } from "@/lib/progress-display";
 
 const singleLineHeaderStyle: CSSProperties = { whiteSpace: "nowrap" };
 const singleLineCellStyle: CSSProperties = {
@@ -32,11 +33,11 @@ const singleLineCellStyle: CSSProperties = {
   textOverflow: "ellipsis",
 };
 
-/** “More” menu — stop / complete match primary action semantics (red / green). */
-const MORE_MENU_STOP_ITEM_CLASS =
-  "!mx-1 !my-0.5 !rounded-md !text-red-900 !bg-red-50 hover:!bg-red-100 active:!bg-red-200 [&.ant-dropdown-menu-item-active]:!bg-red-200 [&.ant-dropdown-menu-item-selected]:!bg-red-200";
-const MORE_MENU_COMPLETE_ITEM_CLASS =
-  "!mx-1 !my-0.5 !rounded-md !text-green-900 !bg-green-50 hover:!bg-green-100 active:!bg-green-200 [&.ant-dropdown-menu-item-active]:!bg-green-200 [&.ant-dropdown-menu-item-selected]:!bg-green-200";
+function documentHref(documentPath: string): string {
+  if (!documentPath) return "";
+  if (/^https?:\/\//i.test(documentPath)) return documentPath;
+  return `${getPublicApiOrigin() || "http://127.0.0.1:8000"}${documentPath}`;
+}
 
 const isNearDeadline = (deadline: string) => {
   if (!deadline || deadline === "-") return false;
@@ -85,9 +86,9 @@ function EmployeeTasksPageContent() {
   const [isSubmittingDeadlineRequest, setIsSubmittingDeadlineRequest] =
     useState(false);
   const [selectedProjectName, setSelectedProjectName] = useState("");
-  const [selectedDocument, setSelectedDocument] = useState<
-    EmployeeManagedTask["documents"][number] | null
-  >(null);
+  const [selectedDocuments, setSelectedDocuments] = useState<
+    EmployeeManagedTask["documents"]
+  >([]);
   const [deadlineTaskId, setDeadlineTaskId] = useState<string | null>(null);
   const [requestedDeadline, setRequestedDeadline] = useState("");
   const [deadlineReason, setDeadlineReason] = useState("");
@@ -101,13 +102,13 @@ function EmployeeTasksPageContent() {
 
   const openProjectDocuments = (task: EmployeeManagedTask) => {
     setSelectedProjectName(task.project);
-    setSelectedDocument(task.documents[0] ?? null);
+    setSelectedDocuments(task.documents);
     setIsDocsModalOpen(true);
   };
 
   const handleDownload = (file: EmployeeManagedTask["documents"][number]) => {
     const anchor = document.createElement("a");
-    anchor.href = file.url;
+    anchor.href = documentHref(file.url);
     anchor.download = file.name;
     anchor.target = "_blank";
     anchor.rel = "noopener noreferrer";
@@ -170,35 +171,28 @@ function EmployeeTasksPageContent() {
 
   const columns: ColumnsType<EmployeeManagedTask> = [
     {
-      title: "Project",
+      title: "Project Name",
       key: "project",
       width: 190,
       align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
-      render: (_, record) => {
-        const rawPid = record.projectId?.trim() ?? "";
-        const projectNumericId =
-          rawPid !== "" && !Number.isNaN(Number(rawPid))
-            ? Number(rawPid)
-            : null;
-        return projectNumericId != null ? (
-          <div className="flex min-w-0 justify-center">
-            <button
-              type="button"
-              className="block max-w-full cursor-pointer truncate rounded-sm text-center text-sm !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2"
-              onClick={() => setProjectModalId(projectNumericId)}
-              aria-label={`View project details: ${record.project}`}
-            >
+      render: (_, record) =>
+        record.projectId ? (
+          <button
+            type="button"
+            className="max-w-full cursor-pointer text-left text-blue-600 hover:underline"
+            onClick={() => setProjectModalId(Number(record.projectId))}
+          >
+            <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
               {record.project}
-            </button>
-          </div>
+            </span>
+          </button>
         ) : (
           <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-cs-text">
             {record.project}
           </span>
-        );
-      },
+        ),
     },
     {
       title: "Milestone",
@@ -227,6 +221,25 @@ function EmployeeTasksPageContent() {
           {value}
         </span>
       ),
+    },
+    {
+      title: "Progress",
+      key: "progressPercent",
+      width: 90,
+      align: "center",
+      onHeaderCell: () => ({ style: singleLineHeaderStyle }),
+      onCell: () => ({ style: singleLineCellStyle }),
+      render: (_, record) => {
+        const raw = clampProgress(record.progressPercent);
+        if (raw <= 0) {
+          return <span className="text-sm text-gray-500">—</span>;
+        }
+        return (
+          <span className="text-sm font-medium tabular-nums text-cs-text">
+            {formatProgressLabel(raw)}
+          </span>
+        );
+      },
     },
     {
       title: "Status",
@@ -295,8 +308,7 @@ function EmployeeTasksPageContent() {
               onClick: () => handleComplete(record.id, record.status),
               disabled: disableAllActions || !canComplete,
               variant: "secondary" as const,
-              className:
-                "h-8 px-3 text-xs !border !border-green-700 !bg-green-600 !text-white [&_svg]:!text-white hover:!bg-green-700 hover:!text-white hover:!border-green-800",
+              className: "h-8 px-3 text-xs",
             };
           }
           if (record.status === "In Progress") {
@@ -307,7 +319,7 @@ function EmployeeTasksPageContent() {
               disabled: disableAllActions || !canStop,
               variant: "ghost" as const,
               className:
-                "h-8 px-3 text-xs !border !border-red-700 !bg-red-600 !text-white [&_svg]:!text-white hover:!bg-red-700 hover:!text-white hover:!border-red-800",
+                "h-8 border border-red-300 bg-transparent px-3 text-xs text-red-600 hover:border-red-400 hover:text-red-700",
             };
           }
           return {
@@ -320,12 +332,18 @@ function EmployeeTasksPageContent() {
           };
         })();
 
-        const secondaryMenuItems: MenuProps["items"] = (() => {
-          const items: MenuProps["items"] = [];
+        const secondaryMenuItems = (() => {
+          const items: {
+            key: string;
+            label: string;
+            icon: ReactNode;
+            disabled: boolean;
+            onClick: () => void;
+          }[] = [];
 
           items.push({
             key: "documents",
-            label: "Project documents",
+            label: "Project files",
             icon: <FolderOpen className="size-4" />,
             disabled: disableAllActions,
             onClick: () => openProjectDocuments(record),
@@ -353,30 +371,20 @@ function EmployeeTasksPageContent() {
             });
           }
           if (canStop) {
-            const stopDisabled = disableAllActions || !canStop;
             items.push({
               key: "stop",
               label: "Stop",
-              icon: <StopCircle className="size-4 text-red-800" />,
-              disabled: stopDisabled,
-              className: cn(
-                MORE_MENU_STOP_ITEM_CLASS,
-                stopDisabled && "!opacity-50",
-              ),
+              icon: <StopCircle className="size-4" />,
+              disabled: disableAllActions || !canStop,
               onClick: () => handleStop(record.id),
             });
           }
           if (canComplete) {
-            const completeDisabled = disableAllActions || !canComplete;
             items.push({
               key: "complete",
               label: "Complete",
-              icon: <Check className="size-4 text-green-800" />,
-              disabled: completeDisabled,
-              className: cn(
-                MORE_MENU_COMPLETE_ITEM_CLASS,
-                completeDisabled && "!opacity-50",
-              ),
+              icon: <Check className="size-4" />,
+              disabled: disableAllActions || !canComplete,
               onClick: () => handleComplete(record.id, record.status),
             });
           }
@@ -427,28 +435,28 @@ function EmployeeTasksPageContent() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="space-y-1">
         <h2 className="h2 font-semibold text-cs-heading">My Tasks</h2>
+        <p className="p1 text-cs-text">Manage and track your assigned tasks</p>
       </div>
 
-      <div className="w-full overflow-hidden rounded-2xl border-1 border-gray-100 bg-white shadow-sm">
-        {loading ? (
-          <p className="px-4 py-3 text-sm text-gray-500 md:px-6">
-            Loading tasks…
-          </p>
-        ) : null}
-        <Table<EmployeeManagedTask>
-          className="w-full [&_.ant-table]:bg-white"
-          rowKey="id"
-          columns={columns}
-          dataSource={myTasks}
-          pagination={{ pageSize: 6 }}
-          scroll={{ x: 1140 }}
-          rowClassName={(record) =>
-            highlightRowId && record.id === highlightRowId
-              ? "!bg-sky-100/90 transition-colors duration-300"
-              : "hover:bg-gray-50/60"
-          }
-        />
-      </div>
+      <Card className="items-start justify-start rounded-2xl shadow-sm">
+        <div className="w-full space-y-4">
+          {loading ? (
+            <p className="text-sm text-gray-500">Loading tasks…</p>
+          ) : null}
+          <Table<EmployeeManagedTask>
+            rowKey="id"
+            columns={columns}
+            dataSource={myTasks}
+            pagination={{ pageSize: 6 }}
+            scroll={{ x: 1200 }}
+            rowClassName={(record) =>
+              highlightRowId && record.id === highlightRowId
+                ? "!bg-sky-100/90 transition-colors duration-300"
+                : "hover:bg-gray-50/60"
+            }
+          />
+        </div>
+      </Card>
 
       <ProjectDetailModal
         open={projectModalId != null}
@@ -457,7 +465,7 @@ function EmployeeTasksPageContent() {
       />
 
       <Modal
-        title="Project Documents"
+        title="Project Files"
         open={isDocsModalOpen}
         onCancel={() => setIsDocsModalOpen(false)}
         footer={null}
@@ -469,33 +477,45 @@ function EmployeeTasksPageContent() {
               : "No project selected"}
           </p>
 
-          {selectedDocument ? (
-            <div className="rounded-lg border border-cs-border px-3 py-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="size-4 text-cs-primary-100" />
-                  <div>
-                    <p className="p1 font-medium text-cs-heading">
-                      {selectedDocument.name}
-                    </p>
-                    <p className="p1 uppercase text-cs-text">
-                      {selectedDocument.type}
-                    </p>
+          {selectedDocuments.length > 0 ? (
+            <div className="space-y-2">
+              {selectedDocuments.map((document) => (
+                <div
+                  key={`${document.url}-${document.name}`}
+                  className="rounded-lg border border-cs-border px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FileText className="size-4 shrink-0 text-cs-primary-100" />
+                      <div className="min-w-0">
+                        <a
+                          href={documentHref(document.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block truncate p1 font-medium text-sky-700 underline-offset-2 hover:underline"
+                        >
+                          {document.name}
+                        </a>
+                        <p className="p1 uppercase text-cs-text">
+                          {document.type}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      className="h-8 shrink-0 px-3 text-xs"
+                      onClick={() => handleDownload(document)}
+                    >
+                      <Download className="size-4" />
+                      Download
+                    </Button>
                   </div>
                 </div>
-                <Button
-                  variant="secondary"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => handleDownload(selectedDocument)}
-                >
-                  <Download className="size-4" />
-                  Download
-                </Button>
-              </div>
+              ))}
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-cs-border p-3 p1 text-cs-text">
-              No documents available for this project yet.
+              No files available for this project yet.
             </p>
           )}
         </div>

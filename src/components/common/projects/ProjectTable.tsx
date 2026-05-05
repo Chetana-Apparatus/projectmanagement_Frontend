@@ -1,18 +1,39 @@
 "use client";
 
-import { Progress } from "antd";
+import { Modal, Progress } from "antd";
 import { renderAsync } from "docx-preview";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import StatusBadge, {
-  type ProjectStatusVariant,
-} from "@/components/common/status/StatusBadge";
 import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
 import Button from "@/components/ui/Button";
 import { getPublicApiOrigin } from "@/lib/api-base";
+import { fetchAllPages } from "@/lib/pms-http";
 import { formatProgressLabel, progressBarValue } from "@/lib/progress-display";
+
+type ProjectAttachmentApi = {
+  id: number;
+  file: string;
+};
+
+function fileLinkHref(documentPath: string): string {
+  if (!documentPath) return "";
+  if (/^https?:\/\//i.test(documentPath)) return documentPath;
+  const apiOrigin = getPublicApiOrigin() || "http://127.0.0.1:8000";
+  return `${apiOrigin}${documentPath}`;
+}
+
+function fileLabelFromPath(path: string): string {
+  const normalized = path.split("?")[0];
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] || path;
+}
+
+function pathWithoutQuery(path: string): string {
+  return path.split("?")[0];
+}
+
 export type ProjectStatus =
   | "Not Started"
   | "In Progress"
@@ -29,6 +50,8 @@ export type Project = {
   expectedDate: string;
   documentUrl: string | null;
   documentName: string;
+  /** Primary file + project file attachments (from API `documents_count`). */
+  documentsCount: number;
   status: ProjectStatus;
   progressPercent: number | null;
 };
@@ -50,48 +73,14 @@ export default function ProjectTable({
   highlightRowId = null,
   onOpenProject,
 }: ProjectTableProps) {
-  const projectStatusBadgeVariant = (
-    status: ProjectStatus,
-  ): ProjectStatusVariant => {
-    switch (status) {
-      case "Not Started":
-        return "deactivated";
-      case "In Progress":
-        return "taskInProgress";
-      case "Completed":
-        return "taskCompleted";
-      case "Delayed":
-        return "delayed";
-      case "Paused":
-        return "taskPaused";
-      case "Blocked":
-        return "taskStopped";
-      default:
-        return "deactivated";
-    }
-  };
-
-  const progressColor = (value: number) => {
-    if (value > 75) return "#16a34a";
-    if (value > 50) return "#2563eb";
-    return "#dc2626";
-  };
-
-  const progressBar = (row: Project) => {
-    const raw = progressBarValue(row.progressPercent);
-    return (
-      <div className="mx-auto w-full max-w-[200px]">
-        <Progress
-          percent={raw}
-          size="small"
-          strokeColor={progressColor(row.progressPercent ?? 0)}
-          trailColor="#e5e7eb"
-          percentPosition={{ align: "center", type: "outer" }}
-          format={() => formatProgressLabel(row.progressPercent)}
-        />
-      </div>
-    );
-  };
+  const [filesModalProject, setFilesModalProject] = useState<Project | null>(
+    null,
+  );
+  const [filesModalRows, setFilesModalRows] = useState<
+    { href: string; label: string }[]
+  >([]);
+  const [filesModalLoading, setFilesModalLoading] = useState(false);
+  const [filesModalError, setFilesModalError] = useState<string | null>(null);
 
   const [previewProject, setPreviewProject] = useState<Project | null>(null);
   const [previewError, setPreviewError] = useState("");
@@ -114,6 +103,81 @@ export default function ProjectTable({
     () => Boolean(previewFileName.toLowerCase().endsWith(".md")),
     [previewFileName],
   );
+
+  useEffect(() => {
+    if (!filesModalProject) {
+      setFilesModalRows([]);
+      setFilesModalError(null);
+      return;
+    }
+    const project = filesModalProject;
+    const projectId = Number(project.id);
+    let cancelled = false;
+    setFilesModalLoading(true);
+    setFilesModalError(null);
+    void (async () => {
+      try {
+        const attachments = await fetchAllPages<ProjectAttachmentApi>(
+          `/api/v1/files/?project=${projectId}`,
+        );
+        if (cancelled) return;
+        const primaryKey = project.documentUrl
+          ? pathWithoutQuery(project.documentUrl)
+          : "";
+        const rows: { href: string; label: string }[] = [];
+        if (project.documentUrl) {
+          rows.push({
+            href: fileLinkHref(project.documentUrl),
+            label:
+              project.documentName || fileLabelFromPath(project.documentUrl),
+          });
+        }
+        for (const att of attachments) {
+          if (primaryKey && pathWithoutQuery(att.file) === primaryKey) {
+            continue;
+          }
+          rows.push({
+            href: fileLinkHref(att.file),
+            label: fileLabelFromPath(att.file),
+          });
+        }
+        setFilesModalRows(rows);
+      } catch (e) {
+        if (!cancelled) {
+          setFilesModalError(
+            e instanceof Error ? e.message : "Failed to load files",
+          );
+          setFilesModalRows([]);
+        }
+      } finally {
+        if (!cancelled) setFilesModalLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filesModalProject]);
+
+  const progressColor = (value: number) => {
+    if (value > 75) return "#16a34a";
+    if (value > 50) return "#2563eb";
+    return "#dc2626";
+  };
+
+  const progressBar = (row: Project) => {
+    const raw = progressBarValue(row.progressPercent);
+    return (
+      <div className="mx-auto w-[160px]">
+        <Progress
+          percent={raw}
+          size="small"
+          strokeColor={progressColor(row.progressPercent ?? 0)}
+          trailColor="#e5e7eb"
+          format={() => formatProgressLabel(row.progressPercent)}
+        />
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (
@@ -173,13 +237,13 @@ export default function ProjectTable({
   }, [previewProject, isMarkdown, absolutePreviewUrl]);
 
   const columns: DataTableColumn[] = [
-    { label: "Project", key: "name", align: "center" },
-    { label: "Start Date", key: "startDate", align: "center" },
-    { label: "Expected Date", key: "expectedDate", align: "center" },
-    { label: "Document", key: "document", align: "center" },
-    { label: "Progress", key: "progress", align: "center" },
-    { label: "Status", key: "status", align: "center" },
-    { label: "Actions", key: "actions", align: "center" },
+    { label: "Project", key: "name" },
+    { label: "Start", key: "startDate" },
+    { label: "End", key: "expectedDate" },
+    { label: "Files", key: "document" },
+    { label: "Progress", key: "progress" },
+    { label: "Status", key: "status" },
+    { label: "Actions", key: "actions" },
   ];
 
   return (
@@ -199,34 +263,25 @@ export default function ProjectTable({
                 }
                 setPreviewProject(row);
               }}
-              className="block w-full max-w-full cursor-pointer truncate text-center text-sm !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2 rounded-sm"
-              aria-label={
-                onOpenProject
-                  ? `View project: ${row.name}`
-                  : `Open document preview for ${row.name}`
-              }
+              className="text-left text-sky-700 underline underline-offset-2 hover:text-sky-900"
             >
               {row.name}
             </button>
           ),
           document: (row) =>
-            row.documentUrl ? (
+            row.documentsCount > 0 ? (
               <button
                 type="button"
-                onClick={() => setPreviewProject(row)}
-                className="text-left text-sky-700 underline underline-offset-2 hover:text-sky-900"
+                onClick={() => setFilesModalProject(row)}
+                className="text-sm font-medium text-sky-700 tabular-nums underline underline-offset-2 hover:text-sky-900"
               >
-                {row.documentName || "View document"}
+                {row.documentsCount}{" "}
+                {row.documentsCount === 1 ? "file" : "files"}
               </button>
             ) : (
-              "-"
+              <span className="text-sm text-gray-400">No files</span>
             ),
           progress: (row: Project) => progressBar(row),
-          status: (row: Project) => (
-            <StatusBadge variant={projectStatusBadgeVariant(row.status)}>
-              {row.status}
-            </StatusBadge>
-          ),
 
           actions: (row: Project) => (
             <div className="flex items-center justify-center gap-2">
@@ -328,6 +383,47 @@ export default function ProjectTable({
           </div>
         </div>
       ) : null}
+
+      <Modal
+        title={
+          filesModalProject ? `Files — ${filesModalProject.name}` : "Files"
+        }
+        open={filesModalProject != null}
+        onCancel={() => setFilesModalProject(null)}
+        footer={null}
+        width={520}
+        destroyOnHidden
+      >
+        {filesModalLoading ? (
+          <p className="text-sm text-gray-600">Loading…</p>
+        ) : null}
+        {filesModalError ? (
+          <p className="text-sm text-red-600">{filesModalError}</p>
+        ) : null}
+        {!filesModalLoading && !filesModalError ? (
+          filesModalRows.length > 0 ? (
+            <ul className="max-h-[min(60vh,320px)] space-y-2 overflow-y-auto text-sm">
+              {filesModalRows.map((item, idx) => (
+                <li
+                  key={`${item.href}-${idx}`}
+                  className="rounded-md border border-gray-100 bg-gray-50/80 px-3 py-2"
+                >
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-sky-700 underline-offset-2 hover:underline"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500">No files found.</p>
+          )
+        ) : null}
+      </Modal>
     </>
   );
 }

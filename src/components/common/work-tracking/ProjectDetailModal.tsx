@@ -123,12 +123,26 @@ function documentHref(documentPath: string): string {
   return `${getPublicApiOrigin() || "http://127.0.0.1:8000"}${documentPath}`;
 }
 
+type ProjectFileAttachment = {
+  id: number;
+  file: string;
+  project: number | null;
+};
+
+function docDisplayName(path: string | null | undefined): string {
+  if (!path) return "";
+  const normalized = path.split("?")[0];
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] || path;
+}
+
 export default function ProjectDetailModal({
   open,
   projectId,
   onClose,
 }: ProjectDetailModalProps) {
   const [project, setProject] = useState<ApiProject | null>(null);
+  const [attachments, setAttachments] = useState<ProjectFileAttachment[]>([]);
   const [milestones, setMilestones] = useState<ApiMilestone[]>([]);
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const [loading, setLoading] = useState(false);
@@ -137,6 +151,7 @@ export default function ProjectDetailModal({
   useEffect(() => {
     if (!open || projectId == null) {
       setProject(null);
+      setAttachments([]);
       setMilestones([]);
       setTasks([]);
       setError(null);
@@ -149,13 +164,17 @@ export default function ProjectDetailModal({
       setLoading(true);
       setError(null);
       try {
-        const [p, ms, ts] = await Promise.all([
+        const [p, ms, ts, files] = await Promise.all([
           loadProject(projectId),
           fetchAllPages<ApiMilestone>("/api/v1/milestones/"),
           fetchAllPages<ApiTask>("/api/v1/tasks/"),
+          fetchAllPages<ProjectFileAttachment>(
+            `/api/v1/files/?project=${projectId}`,
+          ),
         ]);
         if (cancelled) return;
         setProject(p);
+        setAttachments(files);
         setMilestones(ms.filter((m) => m.project === projectId));
         setTasks(ts.filter((t) => t.project === projectId));
       } catch (e) {
@@ -254,7 +273,10 @@ export default function ProjectDetailModal({
     [],
   );
 
-  const docUrl = project?.document ? documentHref(project.document) : "";
+  const totalDocCount =
+    project && typeof project.documents_count === "number"
+      ? project.documents_count
+      : (project?.document ? 1 : 0) + attachments.length;
 
   return (
     <Modal
@@ -322,19 +344,41 @@ export default function ProjectDetailModal({
 
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Document
+              Files ({totalDocCount})
             </h3>
-            {docUrl ? (
-              <a
-                href={docUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-sky-700 underline-offset-2 hover:underline"
-              >
-                Open project document
-              </a>
+            {totalDocCount === 0 ? (
+              <p className="text-sm text-gray-500">No files yet.</p>
             ) : (
-              <p className="text-sm text-gray-500">No document uploaded.</p>
+              <ul className="space-y-2 text-sm">
+                {project.document ? (
+                  <li className="rounded-md border border-gray-100 bg-gray-50/80 px-3 py-2">
+                    <a
+                      href={documentHref(project.document)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-sky-700 underline-offset-2 hover:underline"
+                    >
+                      {docDisplayName(project.document)}
+                    </a>
+                  </li>
+                ) : null}
+                {attachments.map((att) => (
+                  <li
+                    key={att.id}
+                    className="rounded-md border border-gray-100 bg-white px-3 py-2"
+                  >
+                    <a
+                      href={documentHref(att.file)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block min-w-0 truncate font-medium text-sky-700 underline-offset-2 hover:underline"
+                      title={docDisplayName(att.file)}
+                    >
+                      {docDisplayName(att.file)}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

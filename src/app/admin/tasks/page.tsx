@@ -49,10 +49,21 @@ function AdminTasksPageContent() {
   const [progressFilter, setProgressFilter] = useState("");
 
   const [projectOptions, setProjectOptions] = useState<
-    { id: string; name: string; deadline: string }[]
+    {
+      id: string;
+      name: string;
+      deadline: string;
+      startDate: string;
+    }[]
   >([]);
   const [milestoneOptions, setMilestoneOptions] = useState<
-    { id: string; name: string; projectId: string; expectedDate: string }[]
+    {
+      id: string;
+      name: string;
+      projectId: string;
+      expectedDate: string;
+      startDate: string;
+    }[]
   >([]);
   const [employeeOptions, setEmployeeOptions] = useState<
     { id: string; name: string }[]
@@ -102,6 +113,7 @@ function AdminTasksPageContent() {
           id: String(p.id),
           name: p.name,
           deadline: p.deadline ? p.deadline.split("T")[0] : "",
+          startDate: p.start_date ? p.start_date.split("T")[0] : "",
         })),
       );
 
@@ -111,6 +123,7 @@ function AdminTasksPageContent() {
           name: m.name,
           projectId: String(m.project),
           expectedDate: m.end_date ? m.end_date.split("T")[0] : "",
+          startDate: m.start_date ? m.start_date.split("T")[0] : "",
         })),
       );
 

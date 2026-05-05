@@ -48,10 +48,16 @@ function BATasksPageContent() {
   const [employeeFilter, setEmployeeFilter] = useState("");
   const [progressFilter, setProgressFilter] = useState("");
   const [projects, setProjects] = useState<
-    { id: string; name: string; deadline: string }[]
+    { id: string; name: string; deadline: string; startDate: string }[]
   >([]);
   const [milestones, setMilestones] = useState<
-    { id: string; name: string; projectId: string; expectedDate: string }[]
+    {
+      id: string;
+      name: string;
+      projectId: string;
+      expectedDate: string;
+      startDate: string;
+    }[]
   >([]);
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>(
     [],
@@ -100,6 +106,7 @@ function BATasksPageContent() {
           id: String(p.id),
           name: p.name,
           deadline: p.deadline ? p.deadline.split("T")[0] : "",
+          startDate: p.start_date ? p.start_date.split("T")[0] : "",
         })),
       );
       setMilestones(
@@ -108,6 +115,7 @@ function BATasksPageContent() {
           name: m.name,
           projectId: String(m.project),
           expectedDate: m.end_date ? m.end_date.split("T")[0] : "",
+          startDate: m.start_date ? m.start_date.split("T")[0] : "",
         })),
       );
       const latestByTask = buildLatestActivityByTaskId(

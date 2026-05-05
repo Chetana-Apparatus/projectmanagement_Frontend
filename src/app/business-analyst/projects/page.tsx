@@ -35,7 +35,6 @@ function buildProjectFormData(values: ProjectFormValues): FormData {
   fd.append("start_date", values.startDate);
   fd.append("deadline", values.expectedDate);
   fd.append("status", statusMap[values.status]);
-  if (values.documents[0]) fd.append("document", values.documents[0]);
   return fd;
 }
 
@@ -69,18 +68,6 @@ function BAProjectsPageContent() {
   const [projectFilter, setProjectFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [progressFilter, setProgressFilter] = useState("");
-  const uploadExtraProjectFiles = async (projectId: string, files: File[]) => {
-    const extras = files.slice(1);
-    await Promise.all(
-      extras.map(async (file) => {
-        const attachFd = new FormData();
-        attachFd.append("project", projectId);
-        attachFd.append("file", file);
-        await drfFormDataPost("/api/v1/files/", attachFd);
-      }),
-    );
-  };
-
   const filteredProjects = useMemo(
     () =>
       projects.filter((project) => {
@@ -183,13 +170,10 @@ function BAProjectsPageContent() {
         Delayed: "DELAYED",
       };
       fdWithoutDeadline.append("status", statusMap[values.status]);
-      if (values.documents[0])
-        fdWithoutDeadline.append("document", values.documents[0]);
       await drfFormDataPatch<ApiProject>(
         `/api/v1/projects/${projectId}/`,
         fdWithoutDeadline,
       );
-      await uploadExtraProjectFiles(projectId, values.documents);
       showToast("Project updated. Deadline request sent to admin.", "success");
       await loadProjects();
       setPendingDeadlineRequest(null);
@@ -220,24 +204,21 @@ function BAProjectsPageContent() {
             requestedDeadline,
           });
           return;
-        } else {
-          const updated = await drfFormDataPatch<ApiProject>(
-            `/api/v1/projects/${editing.id}/`,
-            fd,
-          );
-          await uploadExtraProjectFiles(String(updated.id), values.documents);
-          showToast("Project updated", "success");
         }
-      } else {
-        const created = await drfFormDataPost<ApiProject>(
-          "/api/v1/projects/",
+        await drfFormDataPatch<ApiProject>(
+          `/api/v1/projects/${editing.id}/`,
           fd,
         );
-        await uploadExtraProjectFiles(String(created.id), values.documents);
-        showToast("Project created", "success");
+        showToast("Project updated", "success");
+        await loadProjects();
+        closeForm();
+        return;
       }
-      await loadProjects();
-      closeForm();
+      const created = await drfFormDataPost<ApiProject>(
+        "/api/v1/projects/",
+        fd,
+      );
+      return created.id;
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Save failed", "error");
     }
@@ -335,6 +316,7 @@ function BAProjectsPageContent() {
 
           <div className="relative z-[101] w-full max-w-4xl">
             <ProjectForm
+              projectId={editing ? Number(editing.id) : null}
               initialValues={
                 editing
                   ? {
@@ -344,11 +326,16 @@ function BAProjectsPageContent() {
                       expectedDate: editing.expectedDate,
                       status: normalizeProjectFormStatus(editing.status),
                       documents: [],
+                      existingPrimaryUrl: editing.documentUrl,
                     }
                   : undefined
               }
               onSubmit={handleSubmit}
               onCancel={closeForm}
+              onSuccessfulCreate={async () => {
+                await loadProjects();
+                closeForm();
+              }}
               statusEditable={false}
             />
           </div>

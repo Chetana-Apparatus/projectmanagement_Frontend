@@ -1,7 +1,5 @@
 import DashboardLayout from "@/components/common/layout/DashboardLayout";
-import AuthGuard from "@/components/guards/AuthGuard";
-
-const BA_ONLY = ["BA"] as const;
+import DashboardRoleGuard from "@/components/guards/DashboardRoleGuard";
 
 export default function BusinessAnalystLayout({
   children,
@@ -9,8 +7,8 @@ export default function BusinessAnalystLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthGuard allowedRoles={BA_ONLY}>
+    <DashboardRoleGuard segment="business-analyst">
       <DashboardLayout userRole="BA">{children}</DashboardLayout>
-    </AuthGuard>
+    </DashboardRoleGuard>
   );
 }

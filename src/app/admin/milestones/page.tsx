@@ -85,7 +85,8 @@ function AdminMilestonesPageContent() {
         projRows.map((p) => ({
           id: String(p.id),
           label: p.name,
-          deadline: p.deadline,
+          deadline: p.deadline ? p.deadline.split("T")[0] : "",
+          startDate: p.start_date ? p.start_date.split("T")[0] : "",
         })),
       );
 

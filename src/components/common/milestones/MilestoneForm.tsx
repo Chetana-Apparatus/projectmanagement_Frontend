@@ -9,7 +9,10 @@ import Input from "@/components/ui/Input";
 export type SelectOption = {
   id: string;
   label: string;
+  /** YYYY-MM-DD project deadline */
   deadline?: string;
+  /** YYYY-MM-DD project start */
+  startDate?: string;
 };
 
 export type MilestoneFormValues = {
@@ -67,6 +70,8 @@ export default function MilestoneForm({
     setValues((prev) => ({ ...prev, [field]: value }));
   };
 
+  const selectedProject = projects.find((p) => p.id === values.projectId);
+
   const validate = () => {
     const nextErrors: FormErrors = {};
 
@@ -77,13 +82,20 @@ export default function MilestoneForm({
       nextErrors.expectedDate = "Expected date is required";
 
     if (
+      selectedProject?.startDate &&
+      values.startDate &&
+      values.startDate < selectedProject.startDate
+    ) {
+      nextErrors.startDate =
+        "Milestone start cannot be before the project start date";
+    }
+    if (
       values.startDate &&
       values.expectedDate &&
       values.expectedDate < values.startDate
     ) {
       nextErrors.expectedDate = "Expected date cannot be before start date";
     }
-    const selectedProject = projects.find((p) => p.id === values.projectId);
     if (
       selectedProject?.deadline &&
       values.expectedDate &&
@@ -224,6 +236,7 @@ export default function MilestoneForm({
                 className="h-11 w-full rounded-lg border px-3 text-sm"
                 type="date"
                 value={values.startDate}
+                min={selectedProject?.startDate ?? undefined}
                 onChange={(e) => setField("startDate", e.target.value)}
               />
               {errors.startDate && (
@@ -240,11 +253,9 @@ export default function MilestoneForm({
                 className="h-11 w-full rounded-lg border px-3 text-sm"
                 type="date"
                 value={values.expectedDate}
+                min={values.startDate || undefined}
                 onChange={(e) => setField("expectedDate", e.target.value)}
-                max={
-                  projects.find((p) => p.id === values.projectId)?.deadline ??
-                  undefined
-                }
+                max={selectedProject?.deadline ?? undefined}
               />
               {errors.expectedDate && (
                 <p className={errorClass}>{errors.expectedDate}</p>

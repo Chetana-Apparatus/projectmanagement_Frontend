@@ -35,9 +35,6 @@ function buildProjectFormData(values: ProjectFormValues): FormData {
   fd.append("start_date", values.startDate);
   fd.append("deadline", values.expectedDate);
   fd.append("status", statusMap[values.status]);
-  if (values.documents[0]) {
-    fd.append("document", values.documents[0]);
-  }
   return fd;
 }
 
@@ -110,18 +107,6 @@ function AdminProjectsPageContent() {
     };
   }, [open]);
 
-  const uploadExtraProjectFiles = async (projectId: string, files: File[]) => {
-    const extras = files.slice(1);
-    await Promise.all(
-      extras.map(async (file) => {
-        const fd = new FormData();
-        fd.append("project", projectId);
-        fd.append("file", file);
-        await drfFormDataPost("/api/v1/files/", fd);
-      }),
-    );
-  };
-
   const filteredProjects = useMemo(
     () =>
       projects.filter((project) => {
@@ -141,23 +126,20 @@ function AdminProjectsPageContent() {
     try {
       const fd = buildProjectFormData(values);
       if (editing) {
-        const updated = await drfFormDataPatch<ApiProject>(
+        await drfFormDataPatch<ApiProject>(
           `/api/v1/projects/${editing.id}/`,
           fd,
         );
-        await uploadExtraProjectFiles(String(updated.id), values.documents);
         showToast("Project updated", "success");
-      } else {
-        const created = await drfFormDataPost<ApiProject>(
-          "/api/v1/projects/",
-          fd,
-        );
-        await uploadExtraProjectFiles(String(created.id), values.documents);
-        showToast("Project created", "success");
+        closeProjectModal();
+        await loadProjects();
+        return;
       }
-
-      closeProjectModal();
-      await loadProjects();
+      const created = await drfFormDataPost<ApiProject>(
+        "/api/v1/projects/",
+        fd,
+      );
+      return created.id;
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Save failed", "error");
     }
@@ -275,6 +257,7 @@ function AdminProjectsPageContent() {
 
           <div className="relative z-[101] w-full max-w-4xl">
             <ProjectForm
+              projectId={editing ? Number(editing.id) : null}
               initialValues={
                 editing
                   ? {
@@ -284,11 +267,16 @@ function AdminProjectsPageContent() {
                       expectedDate: editing.expectedDate,
                       status: normalizeProjectFormStatus(editing.status),
                       documents: [],
+                      existingPrimaryUrl: editing.documentUrl,
                     }
                   : undefined
               }
               onSubmit={handleSubmit}
               onCancel={closeProjectModal}
+              onSuccessfulCreate={async () => {
+                closeProjectModal();
+                await loadProjects();
+              }}
             />
           </div>
         </div>
