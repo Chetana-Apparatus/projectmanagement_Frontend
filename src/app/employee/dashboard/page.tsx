@@ -17,9 +17,9 @@ import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailM
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
-  type ManagedTaskStatus,
   employeeProjectLinkClass,
   employeeProjectLinkTableClass,
+  type ManagedTaskStatus,
   statusBadgeLayoutClass,
 } from "@/features/employee-tasks/status";
 

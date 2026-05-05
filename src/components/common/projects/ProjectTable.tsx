@@ -215,9 +215,7 @@ export default function ProjectTable({
             </button>
           ),
           document: (row) => {
-            const count =
-              row.fileCount ??
-              (row.documentUrl ? 1 : 0);
+            const count = row.fileCount ?? (row.documentUrl ? 1 : 0);
             if (onOpenDocumentFiles && count > 0) {
               return (
                 <button

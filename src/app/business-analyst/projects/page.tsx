@@ -16,18 +16,18 @@ import Button from "@/components/ui/Button";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import type { ApiProject, ApiProjectFile } from "@/lib/admin-mappers";
 import { apiProjectToRow } from "@/lib/admin-mappers";
-import { fetchApiProject } from "@/lib/fetch-api-project";
-import {
-  mergeProjectDocuments,
-  type ProjectFileRow,
-} from "@/lib/project-documents";
 import { apiFetch } from "@/lib/api-client";
+import { fetchApiProject } from "@/lib/fetch-api-project";
 import {
   drfDelete,
   drfFormDataPatch,
   drfFormDataPost,
   fetchAllPages,
 } from "@/lib/pms-http";
+import {
+  mergeProjectDocuments,
+  type ProjectFileRow,
+} from "@/lib/project-documents";
 import { NOTIF_FOCUS_PARAM, stripDeepLinkParams } from "@/lib/url-deep-link";
 
 function buildProjectFormData(values: ProjectFormValues): FormData {
@@ -208,7 +208,7 @@ function BAProjectsPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [open, editing?.id]);
+  }, [open, editing]);
 
   useEffect(() => {
     if (loading) return;

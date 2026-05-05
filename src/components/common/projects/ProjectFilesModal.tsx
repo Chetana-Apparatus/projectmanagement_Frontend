@@ -7,15 +7,11 @@ import { useToast } from "@/components/common/toast/ToastProvider";
 import Button from "@/components/ui/Button";
 import type { ApiProject, ApiProjectFile } from "@/lib/admin-mappers";
 import { fetchApiProject } from "@/lib/fetch-api-project";
+import { drfDelete, drfFormDataPatch, fetchAllPages } from "@/lib/pms-http";
 import {
   mergeProjectDocuments,
   type ProjectFileRow,
 } from "@/lib/project-documents";
-import {
-  drfDelete,
-  drfFormDataPatch,
-  fetchAllPages,
-} from "@/lib/pms-http";
 
 type ProjectFilesModalProps = {
   open: boolean;
@@ -52,7 +48,10 @@ export default function ProjectFilesModal({
       setProject(p);
       setAttachments(allFiles.filter((f) => Number(f.project) === projectId));
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Failed to load files", "error");
+      showToast(
+        e instanceof Error ? e.message : "Failed to load files",
+        "error",
+      );
       setProject(null);
       setAttachments([]);
     } finally {
@@ -113,9 +112,7 @@ export default function ProjectFilesModal({
       centered
       destroyOnHidden
     >
-      {loading ? (
-        <p className="text-sm text-gray-600">Loading files…</p>
-      ) : null}
+      {loading ? <p className="text-sm text-gray-600">Loading files…</p> : null}
 
       {!loading && rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-sm text-gray-500">

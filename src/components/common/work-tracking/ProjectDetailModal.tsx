@@ -12,15 +12,11 @@ import type {
   ApiTask,
 } from "@/lib/admin-mappers";
 import { fetchApiProject } from "@/lib/fetch-api-project";
+import { drfDelete, drfFormDataPatch, fetchAllPages } from "@/lib/pms-http";
 import {
   mergeProjectDocuments,
   type ProjectFileRow,
 } from "@/lib/project-documents";
-import {
-  drfDelete,
-  drfFormDataPatch,
-  fetchAllPages,
-} from "@/lib/pms-http";
 
 type ProjectDetailModalProps = {
   open: boolean;

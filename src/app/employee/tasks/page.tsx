@@ -28,13 +28,13 @@ import {
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import type { ApiProjectFile } from "@/lib/admin-mappers";
 import { getPublicApiOrigin } from "@/lib/api-base";
-import { cn } from "@/lib/utils";
 import { fetchApiProject } from "@/lib/fetch-api-project";
+import { fetchAllPages } from "@/lib/pms-http";
 import {
   mergeProjectDocuments,
   type ProjectFileRow,
 } from "@/lib/project-documents";
-import { fetchAllPages } from "@/lib/pms-http";
+import { cn } from "@/lib/utils";
 
 const singleLineHeaderStyle: CSSProperties = { whiteSpace: "nowrap" };
 const singleLineCellStyle: CSSProperties = {
@@ -223,9 +223,7 @@ function EmployeeTasksPageContent() {
           setDocsModalFetchError(
             e instanceof Error ? e.message : "Could not load project documents",
           );
-          setDocsModalList(
-            mergeTaskAndProjectDocuments(docsModalTaskDocs, []),
-          );
+          setDocsModalList(mergeTaskAndProjectDocuments(docsModalTaskDocs, []));
         }
       } finally {
         if (!cancelled) setDocsModalLoading(false);

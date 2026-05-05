@@ -69,8 +69,7 @@ const STATUS_LABEL: Record<WorkLogUiStatus, string> = {
 };
 
 /** Manual stop (red). Auto stop uses indigo to match Admin Tasks. */
-const STOPPED_BADGE_CLASS =
-  "bg-red-100 text-red-700 ring-0 shadow-none";
+const STOPPED_BADGE_CLASS = "bg-red-100 text-red-700 ring-0 shadow-none";
 const AUTO_STOP_BADGE_CLASS =
   "border border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm shadow-indigo-200/40";
 
