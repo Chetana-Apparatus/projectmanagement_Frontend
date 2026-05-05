@@ -1,10 +1,11 @@
 "use client";
 
-import { Upload, X } from "lucide-react";
+import { Trash2, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import type { ProjectFileRow } from "@/lib/project-documents";
 import { cn } from "@/lib/utils";
 
 export type ProjectFormValues = {
@@ -21,6 +22,10 @@ type Props = {
   onSubmit: (values: ProjectFormValues) => void;
   onCancel: () => void;
   statusEditable?: boolean;
+  /** Server-side files when editing (primary + `/api/v1/files/`). */
+  existingServerFiles?: ProjectFileRow[];
+  onRemoveExistingServerFile?: (row: ProjectFileRow) => void | Promise<void>;
+  removingExistingServerKey?: string | null;
 };
 
 export default function ProjectForm({
@@ -28,6 +33,9 @@ export default function ProjectForm({
   onSubmit,
   onCancel,
   statusEditable = true,
+  existingServerFiles,
+  onRemoveExistingServerFile,
+  removingExistingServerKey,
 }: Props) {
   const [form, setForm] = useState<ProjectFormValues>({
     name: "",
@@ -75,7 +83,26 @@ export default function ProjectForm({
       return;
     }
     setDocumentError("");
-    setForm((prev) => ({ ...prev, documents: next }));
+    setForm((prev) => {
+      const merged = [...prev.documents];
+      for (const f of next) {
+        const dup = merged.some(
+          (x) =>
+            x.name === f.name &&
+            x.size === f.size &&
+            x.lastModified === f.lastModified,
+        );
+        if (!dup) merged.push(f);
+      }
+      return { ...prev, documents: merged };
+    });
+  };
+
+  const removeDocumentAt = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      documents: prev.documents.filter((_, i) => i !== index),
+    }));
   };
 
   /** Label → control gap (keep in sync with Task/Milestone/User forms) */
@@ -195,7 +222,45 @@ export default function ProjectForm({
           </div>
 
           <div className={fieldClass}>
-            <span className={labelClass}>Project document</span>
+            <span className={labelClass}>Project documents</span>
+
+            {existingServerFiles && existingServerFiles.length > 0 ? (
+              <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
+                <p className="mb-2 text-xs font-medium text-gray-600">
+                  Current uploads ({existingServerFiles.length})
+                </p>
+                <ul className="max-h-36 space-y-1.5 overflow-y-auto pr-0.5">
+                  {existingServerFiles.map((row) => (
+                    <li
+                      key={row.key}
+                      className="flex items-center justify-between gap-2 rounded-md border border-white bg-white px-2 py-1.5 text-sm shadow-sm"
+                    >
+                      <a
+                        href={row.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 flex-1 truncate font-normal text-sky-600 underline decoration-sky-500 underline-offset-2 hover:text-sky-700"
+                      >
+                        {row.displayName}
+                      </a>
+                      {onRemoveExistingServerFile ? (
+                        <button
+                          type="button"
+                          className="shrink-0 rounded p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          disabled={removingExistingServerKey === row.key}
+                          onClick={() => {
+                            void onRemoveExistingServerFile(row);
+                          }}
+                          aria-label={`Delete ${row.displayName}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <section
               aria-label="Upload project document, drag and drop or browse"
@@ -250,9 +315,31 @@ export default function ProjectForm({
               </div>
 
               {form.documents.length > 0 && (
-                <p className="mt-3 border-t border-gray-100 pt-3 text-left text-xs font-medium text-emerald-700">
-                  {form.documents.length} file(s) selected
-                </p>
+                <div className="mt-3 border-t border-gray-100 pt-3 text-left">
+                  <p className="mb-2 text-xs font-medium text-emerald-800">
+                    {form.documents.length} file(s) selected
+                  </p>
+                  <ul className="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                    {form.documents.map((file, idx) => (
+                      <li
+                        key={`${file.name}-${file.size}-${idx}`}
+                        className="flex items-center justify-between gap-2 rounded-md border border-gray-100 bg-gray-50/80 px-2 py-1.5 text-sm"
+                      >
+                        <span className="min-w-0 truncate text-cs-text">
+                          {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                          onClick={() => removeDocumentAt(idx)}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               {documentError ? (
                 <p className="mt-2 text-left text-xs text-red-600">

@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import ProjectFilesModal from "@/components/common/projects/ProjectFilesModal";
 import ProjectForm, {
   type ProjectFormValues,
 } from "@/components/common/projects/ProjectForm";
@@ -13,7 +14,13 @@ import { useToast } from "@/components/common/toast/ToastProvider";
 import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
-import { type ApiProject, apiProjectToRow } from "@/lib/admin-mappers";
+import type { ApiProject, ApiProjectFile } from "@/lib/admin-mappers";
+import { apiProjectToRow } from "@/lib/admin-mappers";
+import { fetchApiProject } from "@/lib/fetch-api-project";
+import {
+  mergeProjectDocuments,
+  type ProjectFileRow,
+} from "@/lib/project-documents";
 import {
   drfDelete,
   drfFormDataPatch,
@@ -59,6 +66,16 @@ function AdminProjectsPageContent() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [projectModalId, setProjectModalId] = useState<number | null>(null);
+  const [filesModalProject, setFilesModalProject] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [editExistingFiles, setEditExistingFiles] = useState<ProjectFileRow[]>(
+    [],
+  );
+  const [removingEditFileKey, setRemovingEditFileKey] = useState<string | null>(
+    null,
+  );
   const [projectFilter, setProjectFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [progressFilter, setProgressFilter] = useState("");
@@ -72,7 +89,21 @@ function AdminProjectsPageContent() {
     setLoading(true);
     try {
       const rows = await fetchAllPages<ApiProject>("/api/v1/projects/");
-      setProjects(rows.map(apiProjectToRow));
+      let attachmentRows: ApiProjectFile[] = [];
+      try {
+        attachmentRows = await fetchAllPages<ApiProjectFile>("/api/v1/files/");
+      } catch {
+        attachmentRows = [];
+      }
+      setProjects(
+        rows.map((p) => ({
+          ...apiProjectToRow(p),
+          fileCount: mergeProjectDocuments(
+            p,
+            attachmentRows.filter((f) => Number(f.project) === p.id),
+          ).length,
+        })),
+      );
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load projects");
     } finally {
@@ -83,6 +114,35 @@ function AdminProjectsPageContent() {
   useEffect(() => {
     void loadProjects();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (!open || !editing) {
+      setEditExistingFiles([]);
+      setRemovingEditFileKey(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [p, allFiles] = await Promise.all([
+          fetchApiProject(Number(editing.id)),
+          fetchAllPages<ApiProjectFile>("/api/v1/files/").catch(() => []),
+        ]);
+        if (cancelled) return;
+        setEditExistingFiles(
+          mergeProjectDocuments(
+            p,
+            allFiles.filter((f) => Number(f.project) === Number(editing.id)),
+          ),
+        );
+      } catch {
+        if (!cancelled) setEditExistingFiles([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, editing?.id]);
 
   useEffect(() => {
     if (loading) return;
@@ -120,6 +180,38 @@ function AdminProjectsPageContent() {
         await drfFormDataPost("/api/v1/files/", fd);
       }),
     );
+  };
+
+  const handleRemoveExistingServerFile = async (row: ProjectFileRow) => {
+    if (!editing) return;
+    setRemovingEditFileKey(row.key);
+    try {
+      if (row.source === "attachment" && row.attachmentId != null) {
+        await drfDelete(`/api/v1/files/${row.attachmentId}/`);
+      } else if (row.source === "primary") {
+        const fd = new FormData();
+        fd.append("document", "");
+        await drfFormDataPatch(`/api/v1/projects/${editing.id}/`, fd);
+      } else {
+        return;
+      }
+      showToast("File removed", "success");
+      const [p, allFiles] = await Promise.all([
+        fetchApiProject(Number(editing.id)),
+        fetchAllPages<ApiProjectFile>("/api/v1/files/").catch(() => []),
+      ]);
+      setEditExistingFiles(
+        mergeProjectDocuments(
+          p,
+          allFiles.filter((f) => Number(f.project) === Number(editing.id)),
+        ),
+      );
+      await loadProjects();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Remove failed", "error");
+    } finally {
+      setRemovingEditFileKey(null);
+    }
   };
 
   const filteredProjects = useMemo(
@@ -176,6 +268,8 @@ function AdminProjectsPageContent() {
   const closeProjectModal = () => {
     setOpen(false);
     setEditing(null);
+    setEditExistingFiles([]);
+    setRemovingEditFileKey(null);
     stripDeepLinkParams(["projectId", NOTIF_FOCUS_PARAM]);
   };
 
@@ -251,6 +345,13 @@ function AdminProjectsPageContent() {
         projects={filteredProjects}
         highlightRowId={highlightRowId}
         onOpenProject={(id) => setProjectModalId(Number(id))}
+        onOpenDocumentFiles={(id) => {
+          const proj = projects.find((x) => x.id === id);
+          setFilesModalProject({
+            id: Number(id),
+            name: proj?.name ?? "Project",
+          });
+        }}
         onEdit={(p: Project) => {
           setEditing(p);
           setOpen(true);
@@ -262,6 +363,16 @@ function AdminProjectsPageContent() {
         open={projectModalId != null}
         projectId={projectModalId}
         onClose={() => setProjectModalId(null)}
+        allowDeleteProjectFiles
+        onFilesMutated={() => void loadProjects()}
+      />
+
+      <ProjectFilesModal
+        open={filesModalProject != null}
+        projectId={filesModalProject?.id ?? null}
+        projectName={filesModalProject?.name}
+        onClose={() => setFilesModalProject(null)}
+        onFilesMutated={() => void loadProjects()}
       />
 
       {open ? (
@@ -287,6 +398,11 @@ function AdminProjectsPageContent() {
                     }
                   : undefined
               }
+              existingServerFiles={editing ? editExistingFiles : undefined}
+              onRemoveExistingServerFile={
+                editing ? handleRemoveExistingServerFile : undefined
+              }
+              removingExistingServerKey={removingEditFileKey}
               onSubmit={handleSubmit}
               onCancel={closeProjectModal}
             />

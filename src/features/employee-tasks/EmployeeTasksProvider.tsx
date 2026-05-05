@@ -48,6 +48,17 @@ type EmployeeTaskApi = {
   planned_hours?: number | null;
 };
 
+/** Matches admin / BA dashboard Recent Activity (`formatActivityTime`). */
+function formatActivityTime(iso?: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 type ActivityItem = {
   id: string;
   taskId: string;
@@ -196,8 +207,8 @@ export function EmployeeTasksProvider({
           id: `${item.task_id}-${item.timestamp}-${idx}`,
           taskId: String(item.task_id),
           action: item.action,
-          description: `${item.employee_name} ${item.action.toLowerCase()} task "${item.task_title}" in ${item.project_name}`,
-          time: new Date(item.timestamp).toLocaleString(),
+          description: `${item.action.toLowerCase().replace(/_/g, " ")} task "${item.task_title}" in ${item.project_name}`,
+          time: formatActivityTime(item.timestamp),
         }));
       setRecentActivity(normalizedActivity);
 

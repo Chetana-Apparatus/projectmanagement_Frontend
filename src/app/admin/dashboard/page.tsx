@@ -360,7 +360,7 @@ export default function AdminDashboardPage() {
               const styles: Record<WorkTrackingRow["status"], string> = {
                 Running: "bg-green-100 text-green-600",
                 Paused: "bg-yellow-100 text-yellow-600",
-                Stopped: "bg-gray-100 text-gray-600",
+                Stopped: "bg-red-100 text-red-700",
                 "Auto stop": "bg-indigo-100 text-indigo-800",
               };
 

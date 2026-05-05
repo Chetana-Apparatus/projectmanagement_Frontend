@@ -29,6 +29,8 @@ export type Project = {
   expectedDate: string;
   documentUrl: string | null;
   documentName: string;
+  /** Primary + `/api/v1/files/` attachments (deduped); set by projects pages */
+  fileCount?: number;
   status: ProjectStatus;
   progressPercent: number | null;
 };
@@ -40,6 +42,8 @@ type ProjectTableProps = {
   allowDelete?: boolean;
   highlightRowId?: string | null;
   onOpenProject?: (projectId: string) => void;
+  /** Opens files list modal (count column). */
+  onOpenDocumentFiles?: (projectId: string) => void;
 };
 
 export default function ProjectTable({
@@ -49,6 +53,7 @@ export default function ProjectTable({
   allowDelete = true,
   highlightRowId = null,
   onOpenProject,
+  onOpenDocumentFiles,
 }: ProjectTableProps) {
   const projectStatusBadgeVariant = (
     status: ProjectStatus,
@@ -176,7 +181,7 @@ export default function ProjectTable({
     { label: "Project", key: "name", align: "center" },
     { label: "Start Date", key: "startDate", align: "center" },
     { label: "Expected Date", key: "expectedDate", align: "center" },
-    { label: "Document", key: "document", align: "center" },
+    { label: "Documents", key: "document", align: "center" },
     { label: "Progress", key: "progress", align: "center" },
     { label: "Status", key: "status", align: "center" },
     { label: "Actions", key: "actions", align: "center" },
@@ -209,18 +214,35 @@ export default function ProjectTable({
               {row.name}
             </button>
           ),
-          document: (row) =>
-            row.documentUrl ? (
-              <button
-                type="button"
-                onClick={() => setPreviewProject(row)}
-                className="text-left text-sky-700 underline underline-offset-2 hover:text-sky-900"
-              >
-                {row.documentName || "View document"}
-              </button>
-            ) : (
-              "-"
-            ),
+          document: (row) => {
+            const count =
+              row.fileCount ??
+              (row.documentUrl ? 1 : 0);
+            if (onOpenDocumentFiles && count > 0) {
+              return (
+                <button
+                  type="button"
+                  className="font-normal !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2"
+                  onClick={() => onOpenDocumentFiles(row.id)}
+                  aria-label={`View ${count} project file${count === 1 ? "" : "s"} for ${row.name}`}
+                >
+                  {count}
+                </button>
+              );
+            }
+            if (row.documentUrl) {
+              return (
+                <button
+                  type="button"
+                  onClick={() => setPreviewProject(row)}
+                  className="text-left font-normal text-sky-600 underline decoration-sky-500 underline-offset-2 hover:text-sky-700"
+                >
+                  {row.documentName || "View document"}
+                </button>
+              );
+            }
+            return "-";
+          },
           progress: (row: Project) => progressBar(row),
           status: (row: Project) => (
             <StatusBadge variant={projectStatusBadgeVariant(row.status)}>

@@ -60,6 +60,14 @@ export const statusClassMap: Record<ManagedTaskStatus, string> = {
 export const statusBadgeLayoutClass =
   "inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium leading-none";
 
+/** Project name → opens detail modal (inline / card rows). */
+export const employeeProjectLinkClass =
+  "cursor-pointer font-normal text-sm text-sky-600 underline decoration-sky-500 underline-offset-2 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2";
+
+/** Ant Design table cells may override link colors — use important utilities. */
+export const employeeProjectLinkTableClass =
+  "block max-w-full cursor-pointer truncate rounded-sm text-center font-normal text-sm !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2";
+
 export function isTransitionAllowed(
   from: ManagedTaskStatus,
   to: ManagedTaskStatus,
