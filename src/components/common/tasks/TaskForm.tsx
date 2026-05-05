@@ -83,9 +83,7 @@ function todayYmd(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function latestYmd(
-  ...vals: (string | undefined | null)[]
-): string | undefined {
+function latestYmd(...vals: (string | undefined | null)[]): string | undefined {
   const keys = vals
     .map((v) => (v ? ymdKey(v) : null))
     .filter(Boolean) as string[];
@@ -392,8 +390,7 @@ export default function TaskForm({
             />
             {selectedProject ? (
               <p className="ui-caption text-muted-foreground">
-                Project: start{" "}
-                {ymdKey(selectedProject.startDate ?? "") ?? "—"}
+                Project: start {ymdKey(selectedProject.startDate ?? "") ?? "—"}
                 {selectedProject.deadline
                   ? `, deadline ${ymdKey(selectedProject.deadline)}`
                   : ""}

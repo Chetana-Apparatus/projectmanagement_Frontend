@@ -79,8 +79,7 @@ export default function Sidebar({
             const isDashboardRootLink =
               item.href === "/business-analyst" || item.href === "/employee";
             const isActive = isDashboardRootLink
-              ? pathname === item.href ||
-                pathname === `${item.href}/dashboard`
+              ? pathname === item.href || pathname === `${item.href}/dashboard`
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
 

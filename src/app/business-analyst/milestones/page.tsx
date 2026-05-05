@@ -85,9 +85,7 @@ function BAMilestonesPageContent() {
           id: String(project.id),
           label: project.name,
           deadline: project.deadline ? project.deadline.split("T")[0] : "",
-          startDate: project.start_date
-            ? project.start_date.split("T")[0]
-            : "",
+          startDate: project.start_date ? project.start_date.split("T")[0] : "",
         })),
       );
       setMilestones(
