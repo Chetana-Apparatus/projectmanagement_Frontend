@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CalendarClock,
   CircleCheck,
   FolderPlus,
   ListChecks,
@@ -12,7 +11,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ActivityLog, {
   type ActivityLogItem,
 } from "@/components/common/activity/ActivityLog";
-import Card from "@/components/common/card/Card";
 import DashboardCard from "@/components/common/dashboard/DashboardCard";
 import DataTable, {
   type DataTableColumn,
@@ -229,37 +227,61 @@ export default function AdminDashboardPage() {
 
   const overviewStats = useMemo(
     () => [
-      { title: "Active Projects", value: stats.projects, icon: FolderPlus },
-      { title: "Tasks In Progress", value: stats.inProgress, icon: ListChecks },
-      { title: "Completed Tasks", value: stats.completed, icon: CircleCheck },
+      {
+        title: "Active Projects",
+        value: stats.projects,
+        icon: FolderPlus,
+        valueClassName: "text-amber-700",
+        iconClassName: "text-amber-600",
+        iconWrapperClassName: "bg-amber-100",
+      },
+      {
+        title: "Tasks In Progress",
+        value: stats.inProgress,
+        icon: ListChecks,
+        valueClassName: "text-blue-600",
+        iconClassName: "text-blue-600",
+        iconWrapperClassName: "bg-blue-100",
+      },
+      {
+        title: "Completed Tasks",
+        value: stats.completed,
+        icon: CircleCheck,
+        valueClassName: "text-green-600",
+        iconClassName: "text-green-600",
+        iconWrapperClassName: "bg-green-100",
+      },
       {
         title: "Active Employees",
         value: stats.employees,
         icon: UserRoundCheck,
+        valueClassName: "text-violet-700",
+        iconClassName: "text-violet-600",
+        iconWrapperClassName: "bg-violet-100",
       },
     ],
     [stats],
   );
 
   const projectColumns: DataTableColumn[] = [
-    { label: "Project Name", key: "projectName" },
-    { label: "Current Milestone", key: "milestone" },
-    { label: "Task Status Split", key: "taskSummary" },
-    { label: "Status", key: "status" },
+    { label: "Project Name", key: "projectName", align: "center" },
+    { label: "Current Milestone", key: "milestone", align: "center" },
+    { label: "Task Status Split", key: "taskSummary", align: "center" },
+    { label: "Status", key: "status", align: "center" },
   ];
 
   const workColumns: DataTableColumn[] = [
-    { label: "Employee", key: "employee" },
-    { label: "Current Task / Project", key: "currentFocus" },
-    { label: "Status", key: "status" },
+    { label: "Employee", key: "employee", align: "center" },
+    { label: "Current Task / Project", key: "currentFocus", align: "center" },
+    { label: "Status", key: "status", align: "center" },
   ];
 
   return (
-    <div className="p-6 space-y-10 max-w-7xl mx-auto">
+    <div className="p-6 space-y-10 max-w-7xl mx-auto gap-2">
       <h3 className="h3 font-bold">Dashboard</h3>
 
-      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
-      {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
+      {loadError ? <p className="p1 text-red-600">{loadError}</p> : null}
+      {loading ? <p className="p1 text-gray-500">Loading…</p> : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {overviewStats.map((card) => (
@@ -268,25 +290,33 @@ export default function AdminDashboardPage() {
             title={card.title}
             value={card.value}
             icon={card.icon}
+            valueClassName={card.valueClassName}
+            iconClassName={card.iconClassName}
+            iconWrapperClassName={card.iconWrapperClassName}
           />
         ))}
       </div>
 
       <section className="space-y-3">
-        <div>
-          <h3 className="h3 font-semibold">Project Overview</h3>
-          <p className="p1 text-gray-500">
-            Clear delivery view by milestones and tasks
-          </p>
-        </div>
+        <h3 className="h3 font-semibold ">Project Overview</h3>
 
         <DataTable<ProjectOverviewRow>
           columns={projectColumns}
           data={projectRows}
           pageSize={5}
           renderers={{
+            projectName: (row) => (
+              <span className="block text-center text-sm text-gray-800">
+                {row.projectName}
+              </span>
+            ),
+            milestone: (row) => (
+              <span className="block text-center text-sm text-gray-800">
+                {row.milestone}
+              </span>
+            ),
             taskSummary: (row) => (
-              <p className="max-w-[360px] text-xs text-gray-600 leading-5">
+              <p className="mx-auto max-w-[360px] text-center text-xs leading-5 text-gray-600">
                 {row.taskSummary}
               </p>
             ),
@@ -301,6 +331,40 @@ export default function AdminDashboardPage() {
                 Completed: "bg-green-100 text-green-700",
               };
               return (
+                <div className="flex justify-center">
+                  <span
+                    className={`${statusBadgeLayoutClass} ${styles[status]}`}
+                  >
+                    {status}
+                  </span>
+                </div>
+              );
+            },
+          }}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex justify-between items-center">
+          <h3 className="h3 font-semibold">Work Tracking Summary</h3>
+        </div>
+
+        <DataTable<WorkTrackingRow>
+          columns={workColumns}
+          data={workTracking}
+          pageSize={5}
+          renderers={{
+            status: (_, value) => {
+              const status = value as WorkTrackingRow["status"];
+
+              const styles: Record<WorkTrackingRow["status"], string> = {
+                Running: "bg-green-100 text-green-600",
+                Paused: "bg-yellow-100 text-yellow-600",
+                Stopped: "bg-gray-100 text-gray-600",
+                "Auto stop": "bg-indigo-100 text-indigo-800",
+              };
+
+              return (
                 <span className={`${statusBadgeLayoutClass} ${styles[status]}`}>
                   {status}
                 </span>
@@ -311,44 +375,8 @@ export default function AdminDashboardPage() {
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h3 className="h3 font-semibold">Work Tracking Summary</h3>
-          <p className="p1 text-gray-500">Who is working on what</p>
-        </div>
-
-        <Card className="p-4">
-          <DataTable<WorkTrackingRow>
-            columns={workColumns}
-            data={workTracking}
-            pageSize={5}
-            renderers={{
-              status: (_, value) => {
-                const status = value as WorkTrackingRow["status"];
-
-                const styles: Record<WorkTrackingRow["status"], string> = {
-                  Running: "bg-green-100 text-green-600",
-                  Paused: "bg-yellow-100 text-yellow-600",
-                  Stopped: "bg-gray-100 text-gray-600",
-                  "Auto stop": "bg-indigo-100 text-indigo-800",
-                };
-
-                return (
-                  <span
-                    className={`${statusBadgeLayoutClass} ${styles[status]}`}
-                  >
-                    {status}
-                  </span>
-                );
-              },
-            }}
-          />
-        </Card>
-      </section>
-
-      <section className="space-y-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <CalendarClock size={18} className="text-gray-400" />
             <h3 className="h3 font-semibold">Recent Activity</h3>
           </div>
 

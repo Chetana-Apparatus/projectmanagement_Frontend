@@ -1,4 +1,5 @@
 "use client";
+import type { MenuProps } from "antd";
 import { Dropdown, Modal, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -11,8 +12,7 @@ import {
   PlayCircle,
   StopCircle,
 } from "lucide-react";
-import { type CSSProperties, type ReactNode, Suspense, useState } from "react";
-import Card from "@/components/common/card/Card";
+import { type CSSProperties, Suspense, useState } from "react";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
@@ -23,7 +23,7 @@ import {
   statusClassMap,
 } from "@/features/employee-tasks/status";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
-import { clampProgress, formatProgressLabel } from "@/lib/progress-display";
+import { cn } from "@/lib/utils";
 
 const singleLineHeaderStyle: CSSProperties = { whiteSpace: "nowrap" };
 const singleLineCellStyle: CSSProperties = {
@@ -31,6 +31,12 @@ const singleLineCellStyle: CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
 };
+
+/** “More” menu — stop / complete match primary action semantics (red / green). */
+const MORE_MENU_STOP_ITEM_CLASS =
+  "!mx-1 !my-0.5 !rounded-md !text-red-900 !bg-red-50 hover:!bg-red-100 active:!bg-red-200 [&.ant-dropdown-menu-item-active]:!bg-red-200 [&.ant-dropdown-menu-item-selected]:!bg-red-200";
+const MORE_MENU_COMPLETE_ITEM_CLASS =
+  "!mx-1 !my-0.5 !rounded-md !text-green-900 !bg-green-50 hover:!bg-green-100 active:!bg-green-200 [&.ant-dropdown-menu-item-active]:!bg-green-200 [&.ant-dropdown-menu-item-selected]:!bg-green-200";
 
 const isNearDeadline = (deadline: string) => {
   if (!deadline || deadline === "-") return false;
@@ -164,28 +170,35 @@ function EmployeeTasksPageContent() {
 
   const columns: ColumnsType<EmployeeManagedTask> = [
     {
-      title: "Project Name",
+      title: "Project",
       key: "project",
       width: 190,
       align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
-      render: (_, record) =>
-        record.projectId ? (
-          <button
-            type="button"
-            className="max-w-full cursor-pointer text-left text-blue-600 hover:underline"
-            onClick={() => setProjectModalId(Number(record.projectId))}
-          >
-            <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
+      render: (_, record) => {
+        const rawPid = record.projectId?.trim() ?? "";
+        const projectNumericId =
+          rawPid !== "" && !Number.isNaN(Number(rawPid))
+            ? Number(rawPid)
+            : null;
+        return projectNumericId != null ? (
+          <div className="flex min-w-0 justify-center">
+            <button
+              type="button"
+              className="block max-w-full cursor-pointer truncate rounded-sm text-center text-sm !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2"
+              onClick={() => setProjectModalId(projectNumericId)}
+              aria-label={`View project details: ${record.project}`}
+            >
               {record.project}
-            </span>
-          </button>
+            </button>
+          </div>
         ) : (
           <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-cs-text">
             {record.project}
           </span>
-        ),
+        );
+      },
     },
     {
       title: "Milestone",
@@ -214,25 +227,6 @@ function EmployeeTasksPageContent() {
           {value}
         </span>
       ),
-    },
-    {
-      title: "Progress",
-      key: "progressPercent",
-      width: 90,
-      align: "center",
-      onHeaderCell: () => ({ style: singleLineHeaderStyle }),
-      onCell: () => ({ style: singleLineCellStyle }),
-      render: (_, record) => {
-        const raw = clampProgress(record.progressPercent);
-        if (raw <= 0) {
-          return <span className="text-sm text-gray-500">—</span>;
-        }
-        return (
-          <span className="text-sm font-medium tabular-nums text-cs-text">
-            {formatProgressLabel(raw)}
-          </span>
-        );
-      },
     },
     {
       title: "Status",
@@ -301,7 +295,8 @@ function EmployeeTasksPageContent() {
               onClick: () => handleComplete(record.id, record.status),
               disabled: disableAllActions || !canComplete,
               variant: "secondary" as const,
-              className: "h-8 px-3 text-xs",
+              className:
+                "h-8 px-3 text-xs !border !border-green-700 !bg-green-600 !text-white [&_svg]:!text-white hover:!bg-green-700 hover:!text-white hover:!border-green-800",
             };
           }
           if (record.status === "In Progress") {
@@ -312,7 +307,7 @@ function EmployeeTasksPageContent() {
               disabled: disableAllActions || !canStop,
               variant: "ghost" as const,
               className:
-                "h-8 border border-red-300 bg-transparent px-3 text-xs text-red-600 hover:border-red-400 hover:text-red-700",
+                "h-8 px-3 text-xs !border !border-red-700 !bg-red-600 !text-white [&_svg]:!text-white hover:!bg-red-700 hover:!text-white hover:!border-red-800",
             };
           }
           return {
@@ -325,14 +320,8 @@ function EmployeeTasksPageContent() {
           };
         })();
 
-        const secondaryMenuItems = (() => {
-          const items: {
-            key: string;
-            label: string;
-            icon: ReactNode;
-            disabled: boolean;
-            onClick: () => void;
-          }[] = [];
+        const secondaryMenuItems: MenuProps["items"] = (() => {
+          const items: MenuProps["items"] = [];
 
           items.push({
             key: "documents",
@@ -364,20 +353,30 @@ function EmployeeTasksPageContent() {
             });
           }
           if (canStop) {
+            const stopDisabled = disableAllActions || !canStop;
             items.push({
               key: "stop",
               label: "Stop",
-              icon: <StopCircle className="size-4" />,
-              disabled: disableAllActions || !canStop,
+              icon: <StopCircle className="size-4 text-red-800" />,
+              disabled: stopDisabled,
+              className: cn(
+                MORE_MENU_STOP_ITEM_CLASS,
+                stopDisabled && "!opacity-50",
+              ),
               onClick: () => handleStop(record.id),
             });
           }
           if (canComplete) {
+            const completeDisabled = disableAllActions || !canComplete;
             items.push({
               key: "complete",
               label: "Complete",
-              icon: <Check className="size-4" />,
-              disabled: disableAllActions || !canComplete,
+              icon: <Check className="size-4 text-green-800" />,
+              disabled: completeDisabled,
+              className: cn(
+                MORE_MENU_COMPLETE_ITEM_CLASS,
+                completeDisabled && "!opacity-50",
+              ),
               onClick: () => handleComplete(record.id, record.status),
             });
           }
@@ -428,28 +427,28 @@ function EmployeeTasksPageContent() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="space-y-1">
         <h2 className="h2 font-semibold text-cs-heading">My Tasks</h2>
-        <p className="p1 text-cs-text">Manage and track your assigned tasks</p>
       </div>
 
-      <Card className="items-start justify-start rounded-2xl shadow-sm">
-        <div className="w-full space-y-4">
-          {loading ? (
-            <p className="text-sm text-gray-500">Loading tasks…</p>
-          ) : null}
-          <Table<EmployeeManagedTask>
-            rowKey="id"
-            columns={columns}
-            dataSource={myTasks}
-            pagination={{ pageSize: 6 }}
-            scroll={{ x: 1200 }}
-            rowClassName={(record) =>
-              highlightRowId && record.id === highlightRowId
-                ? "!bg-sky-100/90 transition-colors duration-300"
-                : "hover:bg-gray-50/60"
-            }
-          />
-        </div>
-      </Card>
+      <div className="w-full overflow-hidden rounded-2xl border-1 border-gray-100 bg-white shadow-sm">
+        {loading ? (
+          <p className="px-4 py-3 text-sm text-gray-500 md:px-6">
+            Loading tasks…
+          </p>
+        ) : null}
+        <Table<EmployeeManagedTask>
+          className="w-full [&_.ant-table]:bg-white"
+          rowKey="id"
+          columns={columns}
+          dataSource={myTasks}
+          pagination={{ pageSize: 6 }}
+          scroll={{ x: 1140 }}
+          rowClassName={(record) =>
+            highlightRowId && record.id === highlightRowId
+              ? "!bg-sky-100/90 transition-colors duration-300"
+              : "hover:bg-gray-50/60"
+          }
+        />
+      </div>
 
       <ProjectDetailModal
         open={projectModalId != null}

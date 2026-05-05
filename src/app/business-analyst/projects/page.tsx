@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import ProjectForm, {
@@ -246,19 +246,19 @@ function BAProjectsPageContent() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex justify-between">
-        <h1 className="text-xl font-bold">Project Management</h1>
+        <h2 className="h2 ">Project Management</h2>
         <Button onClick={() => setOpen(true)}>
-          <Plus size={16} /> Add
+          <Plus size={16} /> Add Project
         </Button>
       </div>
 
       {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
       {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-3">
-        <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto py-0.5 sm:gap-x-3">
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-center">
           <select
-            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            className="h-10 w-full min-w-0 rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
           >
@@ -270,7 +270,7 @@ function BAProjectsPageContent() {
             ))}
           </select>
           <select
-            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            className="h-10 w-full min-w-0 rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -279,9 +279,11 @@ function BAProjectsPageContent() {
             <option value="In Progress">In Progress</option>
             <option value="Completed">Completed</option>
             <option value="Delayed">Delayed</option>
+            <option value="Paused">Paused</option>
+            <option value="Blocked">Blocked</option>
           </select>
           <select
-            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            className="h-10 w-full min-w-0 rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
             value={progressFilter}
             onChange={(e) => setProgressFilter(e.target.value)}
           >
@@ -292,7 +294,7 @@ function BAProjectsPageContent() {
           </select>
           <Button
             type="button"
-            variant="secondary"
+            className="h-10 w-full justify-center px-5 lg:w-auto lg:shrink-0"
             onClick={() => {
               setProjectFilter("");
               setStatusFilter("");
@@ -331,13 +333,7 @@ function BAProjectsPageContent() {
             aria-label="Close modal"
           />
 
-          <div className="relative z-[101] w-full max-w-xl">
-            <div className="mb-2 flex justify-end">
-              <Button variant="secondary" size="icon" onClick={closeForm}>
-                <X size={16} />
-              </Button>
-            </div>
-
+          <div className="relative z-[101] w-full max-w-4xl">
             <ProjectForm
               initialValues={
                 editing

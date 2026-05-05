@@ -139,7 +139,14 @@ export default function DataTable<T extends Record<string, unknown>>({
     >
       <Table<T>
         className={cn(
-          "w-full [&_.ant-table-container]:overflow-hidden [&_.ant-table-container]:rounded-b-2xl",
+          "w-full",
+          // Match Card rounded-2xl: shell + header corners + pagination foot (admin / BA / dashboard)
+          "[&_.ant-table-wrapper]:rounded-2xl",
+          "[&_.ant-table]:!rounded-2xl [&_.ant-table]:!bg-transparent",
+          "[&_.ant-table-container]:overflow-hidden [&_.ant-table-container]:!rounded-2xl",
+          "[&_.ant-table-thead>tr>th:first-child]:!rounded-tl-2xl",
+          "[&_.ant-table-thead>tr>th:last-child]:!rounded-tr-2xl",
+          "[&_.ant-table-pagination.ant-table-pagination]:!rounded-b-2xl [&_.ant-table-pagination.ant-table-pagination]:!border-b-0",
           visualVariant === "employee" &&
             "[&_.ant-table-thead>tr>th]:!bg-gray-50/95 [&_.ant-table-thead>tr>th]:before:!hidden",
         )}

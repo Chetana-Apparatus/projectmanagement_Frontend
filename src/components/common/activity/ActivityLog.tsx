@@ -42,7 +42,7 @@ export default function ActivityLog({ items, title }: ActivityLogProps) {
     >
       {title ? (
         <div className="mb-4 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50 text-gray-600 ring-1 ring-gray-100">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-sky-600 ring-1 ring-sky-200/80">
             <Activity className="h-4 w-4" strokeWidth={1.75} />
           </div>
           <h2 className="ui-card-title">{title}</h2>

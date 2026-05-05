@@ -71,7 +71,7 @@ export default function MilestoneTable({
     { label: "Milestone Name", key: "name", align: "center" },
     { label: "Description", key: "description", align: "center" },
     { label: "Start Date", key: "startDate", align: "center" },
-    { label: "Deadline", key: "expectedDate", align: "center" },
+    { label: "Expected Date", key: "expectedDate", align: "center" },
     { label: "Progress", key: "progress", align: "center" },
     { label: "Actions", key: "actions", align: "center" },
   ];
@@ -85,12 +85,19 @@ export default function MilestoneTable({
       renderers={{
         projectName: (row) => {
           const label = projectNameMap[row.projectId] ?? row.projectId;
-          if (!onOpenProjectAction) return label;
+          if (!onOpenProjectAction) {
+            return (
+              <span className="block max-w-full truncate text-cs-text">
+                {label}
+              </span>
+            );
+          }
           return (
             <button
               type="button"
               onClick={() => onOpenProjectAction(row.projectId)}
-              className="text-sky-700 underline underline-offset-2 hover:text-sky-900"
+              className="max-w-full cursor-pointer truncate text-sm !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2 rounded-sm"
+              aria-label={`View project: ${label}`}
             >
               {label}
             </button>

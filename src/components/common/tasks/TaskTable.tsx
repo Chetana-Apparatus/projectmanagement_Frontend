@@ -67,7 +67,7 @@ export default function TaskTable({
     const styleMap: Record<TaskProgress, string> = {
       Complete: "bg-green-100 text-green-700 ring-0 shadow-none",
       Running: "bg-blue-100 text-blue-700 ring-0 shadow-none",
-      Paused: "bg-violet-100 text-violet-700 ring-0 shadow-none",
+      Paused: "bg-yellow-100 text-yellow-700 ring-0 shadow-none",
       Stopped:
         "border border-amber-400 bg-amber-50 text-amber-950 shadow-sm shadow-amber-200/50",
       "Auto stop":
@@ -121,7 +121,7 @@ export default function TaskTable({
                 <button
                   type="button"
                   onClick={() => onOpenProject(row.project)}
-                  className="block max-w-full cursor-pointer truncate text-left text-sm font-medium !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700"
+                  className="block max-w-full cursor-pointer truncate text-left text-sm  !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700"
                 >
                   {label}
                 </button>

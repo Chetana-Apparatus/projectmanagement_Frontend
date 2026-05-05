@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import MilestoneForm, {
@@ -63,12 +63,9 @@ function AdminMilestonesPageContent() {
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(
     null,
   );
-  const [deleteTarget, setDeleteTarget] = useState<MilestoneRecord | null>(
-    null,
-  );
   const [projectModalId, setProjectModalId] = useState<number | null>(null);
   const [projectFilter, setProjectFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [milestoneFilter, setMilestoneFilter] = useState("");
   const [progressFilter, setProgressFilter] = useState("");
 
   const searchParams = useSearchParams();
@@ -132,6 +129,26 @@ function AdminMilestonesPageContent() {
     [projects],
   );
 
+  const milestoneSelectOptions = useMemo(() => {
+    let list = milestones;
+    if (projectFilter) {
+      list = list.filter((m) => m.projectId === projectFilter);
+    }
+    return [...list].sort((a, b) => {
+      const pa = projectNameMap[a.projectId] ?? a.projectId;
+      const pb = projectNameMap[b.projectId] ?? b.projectId;
+      const byP = pa.localeCompare(pb, undefined, { sensitivity: "base" });
+      if (byP !== 0) return byP;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+  }, [milestones, projectFilter, projectNameMap]);
+
+  useEffect(() => {
+    if (!milestoneFilter) return;
+    const ok = milestoneSelectOptions.some((m) => m.id === milestoneFilter);
+    if (!ok) setMilestoneFilter("");
+  }, [milestoneFilter, milestoneSelectOptions]);
+
   const editingMilestone = useMemo(
     () =>
       milestones.find((milestone) => milestone.id === editingMilestoneId) ??
@@ -155,7 +172,7 @@ function AdminMilestonesPageContent() {
     () =>
       milestones.filter((m) => {
         if (projectFilter && m.projectId !== projectFilter) return false;
-        if (statusFilter && m.status !== statusFilter) return false;
+        if (milestoneFilter && m.id !== milestoneFilter) return false;
         const p = m.progressPercent ?? null;
         if (progressFilter === "0-50" && !(p != null && p <= 50)) return false;
         if (progressFilter === "51-75" && !(p != null && p > 50 && p <= 75))
@@ -163,7 +180,7 @@ function AdminMilestonesPageContent() {
         if (progressFilter === "76-100" && !(p != null && p > 75)) return false;
         return true;
       }),
-    [milestones, projectFilter, statusFilter, progressFilter],
+    [milestones, projectFilter, milestoneFilter, progressFilter],
   );
 
   const closeForm = () => {
@@ -200,12 +217,10 @@ function AdminMilestonesPageContent() {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+  const handleDeleteMilestone = async (milestone: MilestoneRecord) => {
     try {
-      await drfDelete(`/api/v1/milestones/${deleteTarget.id}/`);
+      await drfDelete(`/api/v1/milestones/${milestone.id}/`);
       showToast("Milestone deleted successfully", "success");
-      setDeleteTarget(null);
       await reload();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Delete failed", "error");
@@ -213,20 +228,19 @@ function AdminMilestonesPageContent() {
   };
 
   useEffect(() => {
-    const isModalOpen = Boolean(formMode || deleteTarget);
-    if (!isModalOpen) return undefined;
+    if (!formMode) return undefined;
 
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "auto";
     };
-  }, [formMode, deleteTarget]);
+  }, [formMode]);
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="h2">Milestone Management</h3>
+          <h2 className="h2 font-semibold">Milestone Management</h2>
         </div>
         <Button type="button" onClick={() => setFormMode("create")}>
           <Plus size={16} />
@@ -237,12 +251,13 @@ function AdminMilestonesPageContent() {
       {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
       {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-3">
-        <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto py-0.5 sm:gap-x-3">
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
           <select
-            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            className="h-10 w-full min-w-0 rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
+            aria-label="Filter by project"
           >
             <option value="">All projects</option>
             {projects.map((project) => (
@@ -252,20 +267,25 @@ function AdminMilestonesPageContent() {
             ))}
           </select>
           <select
-            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-10 w-full min-w-0 rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={milestoneFilter}
+            onChange={(e) => setMilestoneFilter(e.target.value)}
+            aria-label="Filter by milestone"
           >
-            <option value="">All status</option>
-            <option value="Not Started">Not Started</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Completed">Completed</option>
-            <option value="Delayed">Delayed</option>
+            <option value="">All milestones</option>
+            {milestoneSelectOptions.map((m) => (
+              <option key={m.id} value={m.id}>
+                {projectFilter
+                  ? m.name
+                  : `${projectNameMap[m.projectId] ?? "Project"} · ${m.name}`}
+              </option>
+            ))}
           </select>
           <select
-            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            className="h-10 w-full min-w-0 rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
             value={progressFilter}
             onChange={(e) => setProgressFilter(e.target.value)}
+            aria-label="Filter by progress"
           >
             <option value="">Any progress</option>
             <option value="0-50">0% - 50%</option>
@@ -274,10 +294,10 @@ function AdminMilestonesPageContent() {
           </select>
           <Button
             type="button"
-            variant="secondary"
+            className="h-10 w-full justify-center px-5 sm:col-span-2 xl:col-span-1 2xl:col-span-1 2xl:shrink-0"
             onClick={() => {
               setProjectFilter("");
-              setStatusFilter("");
+              setMilestoneFilter("");
               setProgressFilter("");
             }}
           >
@@ -295,7 +315,9 @@ function AdminMilestonesPageContent() {
           setEditingMilestoneId(milestone.id);
           setFormMode("edit");
         }}
-        onDelete={(milestone) => setDeleteTarget(milestone)}
+        onDelete={(milestone) => {
+          void handleDeleteMilestone(milestone);
+        }}
       />
 
       <ProjectDetailModal
@@ -312,20 +334,7 @@ function AdminMilestonesPageContent() {
             onClick={closeForm}
             aria-label="Close modal"
           />
-          <div className="relative z-50 w-full max-w-4xl space-y-3">
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="h-9 w-9"
-                onClick={closeForm}
-                aria-label="Close milestone form"
-              >
-                <X size={16} />
-              </Button>
-            </div>
-
+          <div className="relative z-50 w-full max-w-4xl">
             <MilestoneForm
               mode={formMode}
               projects={projects}
@@ -333,34 +342,6 @@ function AdminMilestonesPageContent() {
               onCancel={closeForm}
               onSubmit={formMode === "create" ? handleCreate : handleUpdate}
             />
-          </div>
-        </div>
-      ) : null}
-
-      {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-border bg-white p-5 shadow-lg">
-            <h2 className="h3">Delete Milestone</h2>
-            <p className="ui-body mt-2">
-              Are you sure you want to delete this milestone?
-            </p>
-            <p className="ui-caption mt-1 text-gray-600">{deleteTarget.name}</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setDeleteTarget(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="bg-red-600 text-white hover:ring-red-200"
-                onClick={handleConfirmDelete}
-              >
-                Delete
-              </Button>
-            </div>
           </div>
         </div>
       ) : null}

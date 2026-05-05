@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import TaskForm, {
@@ -251,7 +251,6 @@ function AdminTasksPageContent() {
   };
 
   const handleDelete = async (task: Task) => {
-    if (!confirm(`Delete task “${task.name}”?`)) return;
     if (deleteBusyId) return;
     setDeleteBusyId(task.id);
     try {
@@ -291,7 +290,7 @@ function AdminTasksPageContent() {
       {loading ? <p className="ui-body-muted">Loading…</p> : null}
       {loadError ? <p className="ui-body text-red-600">{loadError}</p> : null}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-3">
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
         <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto py-0.5 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-x-3 [&::-webkit-scrollbar]:h-1">
           <select
             className="h-10 min-w-[10rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
@@ -367,7 +366,7 @@ function AdminTasksPageContent() {
 
           <Button
             type="button"
-            variant="secondary"
+            className="h-10 shrink-0 justify-center px-5"
             onClick={() => {
               setProjectFilter("");
               setMilestoneFilter("");
@@ -400,7 +399,7 @@ function AdminTasksPageContent() {
       />
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto p-4">
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <button
             type="button"
             className="absolute inset-0 bg-black/45 backdrop-blur-sm"
@@ -409,30 +408,17 @@ function AdminTasksPageContent() {
             }}
             aria-label="Close modal"
           />
-          <div className="pointer-events-none relative z-50 my-6 w-full max-w-xl space-y-2">
-            <div className="pointer-events-auto flex justify-end">
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={closeModal}
-                disabled={saving}
-              >
-                <X size={16} />
-              </Button>
-            </div>
-
-            <div className="pointer-events-auto">
-              <TaskForm
-                initial={editing}
-                employees={employeeOptions}
-                projects={projectOptions}
-                milestones={milestoneOptions}
-                showAssignedBy
-                submitting={saving}
-                onSubmit={handleSubmit}
-                onCancel={closeModal}
-              />
-            </div>
+          <div className="relative z-50 w-full max-w-4xl">
+            <TaskForm
+              initial={editing}
+              employees={employeeOptions}
+              projects={projectOptions}
+              milestones={milestoneOptions}
+              showAssignedBy
+              submitting={saving}
+              onSubmit={handleSubmit}
+              onCancel={closeModal}
+            />
           </div>
         </div>
       ) : null}

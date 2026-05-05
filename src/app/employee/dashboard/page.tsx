@@ -2,7 +2,6 @@
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
-  Activity,
   CircleCheck,
   ListChecks,
   ListTodo,
@@ -16,7 +15,20 @@ import DashboardCard from "@/components/common/dashboard/DashboardCard";
 import StatusBadge from "@/components/common/status/StatusBadge";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
-import type { ManagedTaskStatus } from "@/features/employee-tasks/status";
+import {
+  type ManagedTaskStatus,
+  statusBadgeLayoutClass,
+} from "@/features/employee-tasks/status";
+
+const ACTIVITY_ACTION_BADGE_CLASS: Record<
+  "STARTED" | "PAUSED" | "STOPPED" | "COMPLETED",
+  string
+> = {
+  STARTED: "bg-blue-100 text-blue-700",
+  PAUSED: "bg-yellow-100 text-yellow-700",
+  STOPPED: "bg-red-100 text-red-700",
+  COMPLETED: "bg-green-100 text-green-700",
+};
 
 function getStatusVariant(status: ManagedTaskStatus) {
   switch (status) {
@@ -136,24 +148,32 @@ export default function EmployeeDashboardPage() {
         label: "In Progress",
         value: tasks.filter((task) => task.status === "In Progress").length,
         valueClass: "text-blue-600",
+        iconClassName: "text-blue-600",
+        iconWrapperClassName: "bg-blue-100",
         icon: ListChecks,
       },
       {
         label: "Paused",
         value: tasks.filter((task) => task.status === "Paused").length,
         valueClass: "text-yellow-700",
+        iconClassName: "text-yellow-700",
+        iconWrapperClassName: "bg-yellow-100",
         icon: PauseCircle,
       },
       {
         label: "Completed",
         value: completedTasksCount,
         valueClass: "text-green-700",
+        iconClassName: "text-green-600",
+        iconWrapperClassName: "bg-green-100",
         icon: CircleCheck,
       },
       {
         label: "Total Tasks",
         value: tasks.length,
         valueClass: "text-cs-primary-100",
+        iconClassName: "text-cs-primary-100",
+        iconWrapperClassName: "bg-sky-100",
         icon: ListTodo,
       },
     ],
@@ -257,6 +277,8 @@ export default function EmployeeDashboardPage() {
             value={stat.value}
             icon={stat.icon}
             valueClassName={stat.valueClass}
+            iconClassName={stat.iconClassName}
+            iconWrapperClassName={stat.iconWrapperClassName}
           />
         ))}
       </div>
@@ -280,18 +302,25 @@ export default function EmployeeDashboardPage() {
             {recentActivity.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start justify-between rounded-xl border border-cs-border p-3"
+                className="flex items-start justify-between gap-3 rounded-xl border border-cs-border bg-white p-3"
               >
-                <div className="flex items-start gap-3">
-                  <Activity className="mt-0.5 size-4 text-cs-primary-100" />
-                  <div>
-                    <p className="p1 font-medium text-cs-heading">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <span
+                    className="mt-1.5 size-2 shrink-0 rounded-full bg-sky-400"
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <span
+                      className={`${statusBadgeLayoutClass} font-semibold uppercase tracking-wide ${ACTIVITY_ACTION_BADGE_CLASS[item.action] ?? "bg-gray-100 text-gray-600"}`}
+                    >
                       {item.action.replaceAll("_", " ")}
-                    </p>
+                    </span>
                     <p className="p1 text-cs-text">{item.description}</p>
                   </div>
                 </div>
-                <p className="p1 text-cs-text">{item.time}</p>
+                <p className="p1 shrink-0 whitespace-nowrap text-cs-text">
+                  {item.time}
+                </p>
               </div>
             ))}
           </div>

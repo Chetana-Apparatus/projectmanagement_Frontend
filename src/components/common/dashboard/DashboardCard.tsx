@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import Card from "@/components/common/card/Card";
+import { cn } from "@/lib/utils";
 
 export type DashboardCardProps = {
   title: string;
@@ -7,6 +8,10 @@ export type DashboardCardProps = {
   icon: LucideIcon;
   description?: string;
   valueClassName?: string;
+  /** Icon stroke/fill color (e.g. text-blue-600). */
+  iconClassName?: string;
+  /** Icon tile background (e.g. bg-blue-100). */
+  iconWrapperClassName?: string;
 };
 
 export default function DashboardCard({
@@ -15,6 +20,8 @@ export default function DashboardCard({
   icon: Icon,
   description,
   valueClassName = "text-blue-600",
+  iconClassName = "text-gray-600",
+  iconWrapperClassName = "bg-gray-100",
 }: DashboardCardProps) {
   return (
     <Card
@@ -33,8 +40,13 @@ export default function DashboardCard({
           </p>
           {description ? <p className="ui-caption">{description}</p> : null}
         </div>
-        <div className="shrink-0 self-start rounded-lg bg-gray-100 p-3 text-gray-600">
-          <Icon className="h-5 w-5" strokeWidth={1.75} />
+        <div
+          className={cn(
+            "shrink-0 self-start rounded-lg p-3",
+            iconWrapperClassName,
+          )}
+        >
+          <Icon className={cn("h-5 w-5", iconClassName)} strokeWidth={1.75} />
         </div>
       </div>
     </Card>

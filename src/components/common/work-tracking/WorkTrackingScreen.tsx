@@ -32,6 +32,7 @@ import {
   buildLatestActivityByTaskId,
   type RecentActivityAction,
 } from "@/lib/recent-activity";
+import { cn } from "@/lib/utils";
 
 export type WorkLogUiStatus =
   | "not-started"
@@ -76,7 +77,7 @@ const AUTO_STOP_BADGE_CLASS =
 const STATUS_PILL_CLASS: Record<WorkLogUiStatus, string> = {
   "not-started": "bg-gray-100 text-gray-600 ring-0 shadow-none",
   running: "bg-blue-100 text-blue-700 ring-0 shadow-none",
-  paused: "bg-violet-100 text-violet-700 ring-0 shadow-none",
+  paused: "bg-yellow-100 text-yellow-700 ring-0 shadow-none",
   stopped: STOPPED_BADGE_CLASS,
   "auto-stopped": AUTO_STOP_BADGE_CLASS,
   completed: "bg-green-100 text-green-700 ring-0 shadow-none",
@@ -460,28 +461,28 @@ export default function WorkTrackingScreen() {
       {
         key: "running",
         title: "Running",
-
         value: summary.started,
         color: "text-emerald-700",
-        iconBg: "text-emerald-500/80",
+        iconWrapperClassName: "bg-emerald-100",
+        iconClassName: "text-emerald-600",
         Icon: PlayCircle,
       },
       {
         key: "completed",
         title: "Complete",
-
         value: summary.completed,
         color: "text-teal-800",
-        iconBg: "text-teal-600/80",
+        iconWrapperClassName: "bg-teal-100",
+        iconClassName: "text-teal-600",
         Icon: CheckCircle2,
       },
       {
         key: "delayed",
         title: "Delayed",
-
         value: summary.delayed,
         color: "text-orange-800",
-        iconBg: "text-orange-500/80",
+        iconWrapperClassName: "bg-orange-100",
+        iconClassName: "text-orange-600",
         Icon: AlertTriangle,
       },
       {
@@ -489,7 +490,8 @@ export default function WorkTrackingScreen() {
         title: "Paused",
         value: summary.paused,
         color: "text-amber-800",
-        iconBg: "text-amber-500/80",
+        iconWrapperClassName: "bg-yellow-100",
+        iconClassName: "text-yellow-700",
         Icon: PauseCircle,
       },
     ],
@@ -502,7 +504,7 @@ export default function WorkTrackingScreen() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-2">
           <h2 className="h2">Work tracking</h2>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -521,27 +523,45 @@ export default function WorkTrackingScreen() {
         className="grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-4"
         aria-label="Work status summary"
       >
-        {summaryCards.map(({ key, title, value, color, iconBg, Icon }) => (
-          <li key={key} className="min-w-0">
-            <Card
-              variant="surface"
-              padding="none"
-              className="h-full border border-gray-100/90 p-3 shadow-sm !flex-row !items-center !justify-between gap-2"
-            >
-              <div className="min-w-0">
-                <p className="p1  uppercase tracking-wide text-gray-500">
-                  {title}
-                </p>
-                <p
-                  className={`mt-1 text-xl font-bold tabular-nums tracking-tight ${color}`}
+        {summaryCards.map(
+          ({
+            key,
+            title,
+            value,
+            color,
+            iconWrapperClassName,
+            iconClassName,
+            Icon,
+          }) => (
+            <li key={key} className="min-w-0">
+              <Card
+                variant="surface"
+                padding="none"
+                className="h-full border border-gray-100/90 p-3 shadow-sm !flex-row !items-center !justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <p className="p1  uppercase tracking-wide text-gray-500">
+                    {title}
+                  </p>
+                  <p
+                    className={`mt-1 text-xl font-bold tabular-nums tracking-tight ${color}`}
+                  >
+                    {value}
+                  </p>
+                </div>
+                <div
+                  className={cn(
+                    "shrink-0 rounded-lg p-2",
+                    iconWrapperClassName,
+                  )}
+                  aria-hidden
                 >
-                  {value}
-                </p>
-              </div>
-              <Icon className={`h-6 w-6 shrink-0 ${iconBg}`} aria-hidden />
-            </Card>
-          </li>
-        ))}
+                  <Icon className={cn("h-6 w-6", iconClassName)} />
+                </div>
+              </Card>
+            </li>
+          ),
+        )}
       </ul>
 
       <Card

@@ -4,6 +4,9 @@ import { Progress } from "antd";
 import { renderAsync } from "docx-preview";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import StatusBadge, {
+  type ProjectStatusVariant,
+} from "@/components/common/status/StatusBadge";
 import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
@@ -47,6 +50,27 @@ export default function ProjectTable({
   highlightRowId = null,
   onOpenProject,
 }: ProjectTableProps) {
+  const projectStatusBadgeVariant = (
+    status: ProjectStatus,
+  ): ProjectStatusVariant => {
+    switch (status) {
+      case "Not Started":
+        return "deactivated";
+      case "In Progress":
+        return "taskInProgress";
+      case "Completed":
+        return "taskCompleted";
+      case "Delayed":
+        return "delayed";
+      case "Paused":
+        return "taskPaused";
+      case "Blocked":
+        return "taskStopped";
+      default:
+        return "deactivated";
+    }
+  };
+
   const progressColor = (value: number) => {
     if (value > 75) return "#16a34a";
     if (value > 50) return "#2563eb";
@@ -56,12 +80,13 @@ export default function ProjectTable({
   const progressBar = (row: Project) => {
     const raw = progressBarValue(row.progressPercent);
     return (
-      <div className="mx-auto w-[160px]">
+      <div className="mx-auto w-full max-w-[200px]">
         <Progress
           percent={raw}
           size="small"
           strokeColor={progressColor(row.progressPercent ?? 0)}
           trailColor="#e5e7eb"
+          percentPosition={{ align: "center", type: "outer" }}
           format={() => formatProgressLabel(row.progressPercent)}
         />
       </div>
@@ -148,13 +173,13 @@ export default function ProjectTable({
   }, [previewProject, isMarkdown, absolutePreviewUrl]);
 
   const columns: DataTableColumn[] = [
-    { label: "Project", key: "name" },
-    { label: "Start", key: "startDate" },
-    { label: "End", key: "expectedDate" },
-    { label: "Document", key: "document" },
-    { label: "Progress", key: "progress" },
-    { label: "Status", key: "status" },
-    { label: "Actions", key: "actions" },
+    { label: "Project", key: "name", align: "center" },
+    { label: "Start Date", key: "startDate", align: "center" },
+    { label: "Expected Date", key: "expectedDate", align: "center" },
+    { label: "Document", key: "document", align: "center" },
+    { label: "Progress", key: "progress", align: "center" },
+    { label: "Status", key: "status", align: "center" },
+    { label: "Actions", key: "actions", align: "center" },
   ];
 
   return (
@@ -174,7 +199,12 @@ export default function ProjectTable({
                 }
                 setPreviewProject(row);
               }}
-              className="text-left text-sky-700 underline underline-offset-2 hover:text-sky-900"
+              className="block w-full max-w-full cursor-pointer truncate text-center text-sm !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 focus-visible:ring-offset-2 rounded-sm"
+              aria-label={
+                onOpenProject
+                  ? `View project: ${row.name}`
+                  : `Open document preview for ${row.name}`
+              }
             >
               {row.name}
             </button>
@@ -192,6 +222,11 @@ export default function ProjectTable({
               "-"
             ),
           progress: (row: Project) => progressBar(row),
+          status: (row: Project) => (
+            <StatusBadge variant={projectStatusBadgeVariant(row.status)}>
+              {row.status}
+            </StatusBadge>
+          ),
 
           actions: (row: Project) => (
             <div className="flex items-center justify-center gap-2">

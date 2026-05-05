@@ -269,7 +269,25 @@ export default function ProjectDetailModal({
       onCancel={onClose}
       footer={null}
       width={920}
+      centered
       destroyOnHidden
+      styles={{
+        root: {
+          maxHeight: "min(92vh, calc(100vh - 1.5rem))",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          paddingBottom: 0,
+        },
+        header: { flexShrink: 0 },
+        body: {
+          maxHeight: "calc(min(92vh, 100vh - 1.5rem) - 4.5rem)",
+          overflowX: "hidden",
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          paddingTop: 12,
+        },
+      }}
     >
       {loading ? (
         <p className="text-sm text-gray-600">Loading project…</p>
@@ -293,7 +311,7 @@ export default function ProjectDetailModal({
 
           {project.description ? (
             <div>
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <h3 className="mb-1 h3 font-semibold uppercase tracking-wide text-gray-500">
                 Description
               </h3>
               <p className="whitespace-pre-wrap text-gray-700">

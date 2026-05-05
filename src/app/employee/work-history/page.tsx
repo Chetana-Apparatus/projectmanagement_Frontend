@@ -1,7 +1,6 @@
 "use client";
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import Card from "@/components/common/card/Card";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
   type EmployeeManagedTask,
@@ -56,20 +55,18 @@ export default function EmployeeWorkHistoryPage() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="space-y-1">
         <h2 className="h2 font-semibold text-cs-heading">Work History</h2>
-        <p className="p1 text-cs-text">Completed and auto-stopped tasks</p>
       </div>
 
-      <Card className="items-start justify-start rounded-2xl shadow-sm">
-        <div className="w-full space-y-4">
-          <Table<EmployeeManagedTask>
-            rowKey="id"
-            columns={columns}
-            dataSource={historyTasks}
-            pagination={{ pageSize: 8 }}
-            scroll={{ x: 900 }}
-          />
-        </div>
-      </Card>
+      <div className="w-full overflow-hidden rounded-2xl border-1 border-gray-100 bg-white shadow-sm">
+        <Table<EmployeeManagedTask>
+          className="w-full [&_.ant-table]:bg-white"
+          rowKey="id"
+          columns={columns}
+          dataSource={historyTasks}
+          pagination={{ pageSize: 8 }}
+          scroll={{ x: 900 }}
+        />
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
 import Button from "@/components/ui/Button";
@@ -106,7 +107,7 @@ export default function MilestoneForm({
     });
   };
 
-  const fieldClass = "space-y-1.5";
+  const fieldClass = "flex flex-col gap-1.5";
   const labelClass = "text-sm font-medium text-cs-heading";
   const errorClass = "text-xs text-red-500";
 
@@ -120,12 +121,21 @@ export default function MilestoneForm({
       className="flex max-h-[calc(100vh-8rem)] w-full !flex-col !items-stretch !justify-start overflow-hidden rounded-lg border border-border/80 !bg-white shadow-2xl"
     >
       <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-        {/* HEADER */}
-        <div className="shrink-0 border-b border-gray-100 bg-white px-6 py-4 text-center">
-          <h2 className="h3">{title}</h2>
-          <p className="ui-body-muted">
-            Manage milestone timeline and project details.
-          </p>
+        <div className="flex shrink-0 items-start border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
+          <div className="w-9 shrink-0" aria-hidden />
+          <div className="min-w-0 flex-1 text-center">
+            <h2 className="h2 font-semibold">{title}</h2>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            onClick={onCancel}
+            aria-label="Close milestone form"
+          >
+            <X size={16} />
+          </Button>
         </div>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6 pr-4">
@@ -196,7 +206,7 @@ export default function MilestoneForm({
             </label>
             <textarea
               id="milestone-description"
-              className="min-h-[90px] w-full rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cs-primary-100/30"
+              className="min-h-[90px] w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cs-primary-100/30"
               value={values.description}
               onChange={(e) => setField("description", e.target.value)}
               placeholder="Enter milestone description"

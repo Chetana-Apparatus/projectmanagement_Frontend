@@ -30,7 +30,9 @@ type EmployeeDashboardPayload = {
 
 type EmployeeTaskApi = {
   id: number;
-  project?: number;
+  /** Primary key of the project (serializer may use `project` or `project_id`). */
+  project?: number | string | null;
+  project_id?: number | string | null;
   project_name?: string;
   project_document?: string | null;
   milestone_name?: string | null;
@@ -111,7 +113,11 @@ export function EmployeeTasksProvider({
         }));
       return {
         id: String(task.id),
-        projectId: String(task.project ?? ""),
+        projectId: (() => {
+          const raw = task.project ?? task.project_id;
+          if (raw === null || raw === undefined || raw === "") return "";
+          return String(raw).trim();
+        })(),
         project: task.project_name ?? "-",
         milestone: task.milestone_name ?? "-",
         task: task.title,

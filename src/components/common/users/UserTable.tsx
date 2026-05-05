@@ -34,15 +34,15 @@ type UserTableProps = {
 
 export default function UserTable({ users, onEdit, onDelete }: UserTableProps) {
   const columns: DataTableColumn[] = [
-    { label: "First Name", key: "firstName" },
-    { label: "Last Name", key: "lastName" },
-    { label: "Email", key: "email" },
-    { label: "Designation", key: "designation" },
-    { label: "Developer Type", key: "developerType" },
-    { label: "Tech Stack", key: "techStack" },
-    { label: "Role", key: "role" },
-    { label: "Status", key: "status" },
-    { label: "Actions", key: "actions" },
+    { label: "First Name", key: "firstName", align: "center" },
+    { label: "Last Name", key: "lastName", align: "center" },
+    { label: "Email", key: "email", align: "center" },
+    { label: "Designation", key: "designation", align: "center" },
+    { label: "Developer Type", key: "developerType", align: "center" },
+    { label: "Tech Stack", key: "techStack", align: "center" },
+    { label: "Role", key: "role", align: "center" },
+    { label: "Status", key: "status", align: "center" },
+    { label: "Actions", key: "actions", align: "center" },
   ];
 
   return (
