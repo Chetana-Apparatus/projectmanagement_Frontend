@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload, X } from "lucide-react";
+import { Trash2, Upload, X } from "lucide-react";
 import {
   type ChangeEvent,
   type FormEvent,
@@ -19,6 +19,7 @@ import {
   fetchAllPages,
   uploadProjectDocumentFiles,
 } from "@/lib/pms-http";
+import type { ProjectFileRow } from "@/lib/project-documents";
 
 export type ProjectFormValues = {
   name: string;
@@ -52,6 +53,10 @@ type Props = {
   /** Called after a new project is saved and any initial documents are uploaded. */
   onSuccessfulCreate?: () => void | Promise<void>;
   statusEditable?: boolean;
+  /** Server-side files when editing (primary + `/api/v1/files/`). */
+  existingServerFiles?: ProjectFileRow[];
+  onRemoveExistingServerFile?: (row: ProjectFileRow) => void | Promise<void>;
+  removingExistingServerKey?: string | null;
 };
 
 const DOC_NAME_RE = /\.(docx|md)$/i;
@@ -76,6 +81,9 @@ export default function ProjectForm({
   onCancel,
   onSuccessfulCreate,
   statusEditable = true,
+  existingServerFiles,
+  onRemoveExistingServerFile,
+  removingExistingServerKey,
 }: Props) {
   const { showToast } = useToast();
   const [form, setForm] = useState<ProjectFormValues>({
@@ -100,6 +108,8 @@ export default function ProjectForm({
   const [uploadBusy, setUploadBusy] = useState(false);
 
   const isEdit = projectId != null;
+  const fieldClass = "flex flex-col gap-1.5";
+  const labelClass = "text-sm font-medium text-cs-heading";
 
   const refreshAttachments = useCallback(async (pid: number) => {
     const rows = await fetchAllPages<ProjectFileAttachment>(
@@ -159,7 +169,19 @@ export default function ProjectForm({
       return;
     }
     setDocumentError("");
-    setForm((prev) => ({ ...prev, documents: [...prev.documents, ...next] }));
+    setForm((prev) => {
+      const merged = [...prev.documents];
+      for (const f of next) {
+        const dup = merged.some(
+          (x) =>
+            x.name === f.name &&
+            x.size === f.size &&
+            x.lastModified === f.lastModified,
+        );
+        if (!dup) merged.push(f);
+      }
+      return { ...prev, documents: merged };
+    });
   };
 
   const removePendingDocument = (index: number) => {
@@ -423,8 +445,46 @@ export default function ProjectForm({
           </div>
 
           {/* FILES */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Files</p>
+          <div className={fieldClass}>
+            <span className={labelClass}>Project documents</span>
+
+            {existingServerFiles && existingServerFiles.length > 0 ? (
+              <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
+                <p className="mb-2 text-xs font-medium text-gray-600">
+                  Current uploads ({existingServerFiles.length})
+                </p>
+                <ul className="max-h-36 space-y-1.5 overflow-y-auto pr-0.5">
+                  {existingServerFiles.map((row) => (
+                    <li
+                      key={row.key}
+                      className="flex items-center justify-between gap-2 rounded-md border border-white bg-white px-2 py-1.5 text-sm shadow-sm"
+                    >
+                      <a
+                        href={row.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 flex-1 truncate font-normal text-sky-600 underline decoration-sky-500 underline-offset-2 hover:text-sky-700"
+                      >
+                        {row.displayName}
+                      </a>
+                      {onRemoveExistingServerFile ? (
+                        <button
+                          type="button"
+                          className="shrink-0 rounded p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          disabled={removingExistingServerKey === row.key}
+                          onClick={() => {
+                            void onRemoveExistingServerFile(row);
+                          }}
+                          aria-label={`Delete ${row.displayName}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {isEdit ? (
               <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/80 p-3">

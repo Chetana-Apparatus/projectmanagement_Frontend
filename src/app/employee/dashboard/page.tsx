@@ -9,13 +9,16 @@ import {
   PlayCircle,
   Square,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Card from "@/components/common/card/Card";
 import DashboardCard from "@/components/common/dashboard/DashboardCard";
 import StatusBadge from "@/components/common/status/StatusBadge";
+import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
+  employeeProjectLinkClass,
+  employeeProjectLinkTableClass,
   type ManagedTaskStatus,
   statusBadgeLayoutClass,
 } from "@/features/employee-tasks/status";
@@ -54,44 +57,22 @@ type DashboardTaskRow = {
   key: string;
   taskName: string;
   project: string;
+  projectId: string;
   milestone: string;
   startDate: string;
   expectedDate: string;
   status: ManagedTaskStatus;
 };
 
-const columns: ColumnsType<DashboardTaskRow> = [
-  {
-    title: "Task Name",
-    dataIndex: "taskName",
-    key: "taskName",
-    align: "center",
-  },
-  {
-    title: "Project",
-    dataIndex: "project",
-    key: "project",
-    align: "center",
-  },
-  {
-    title: "Milestone",
-    dataIndex: "milestone",
-    key: "milestone",
-    align: "center",
-  },
-  {
-    title: "Status",
-    key: "status",
-    align: "center",
-    render: (_, record) => (
-      <StatusBadge variant={getStatusVariant(record.status)}>
-        {record.status}
-      </StatusBadge>
-    ),
-  },
-];
+function formatExpectedEndDate(value: string) {
+  if (!value || value === "-") return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString();
+}
 
 export default function EmployeeDashboardPage() {
+  const [projectModalId, setProjectModalId] = useState<number | null>(null);
   const {
     loading,
     tasks,
@@ -118,6 +99,7 @@ export default function EmployeeDashboardPage() {
           key: task.id,
           taskName: task.task,
           project: task.project,
+          projectId: task.projectId,
           milestone: task.milestone,
           startDate: task.startDate,
           expectedDate: task.deadline,
@@ -125,6 +107,71 @@ export default function EmployeeDashboardPage() {
         })),
     [myTasks],
   );
+
+  const columns = useMemo<ColumnsType<DashboardTaskRow>>(
+    () => [
+      {
+        title: "Task Name",
+        dataIndex: "taskName",
+        key: "taskName",
+        align: "center",
+      },
+      {
+        title: "Project",
+        key: "project",
+        align: "center",
+        render: (_, record) => {
+          const rawPid = record.projectId?.trim() ?? "";
+          const projectNumericId =
+            rawPid !== "" && !Number.isNaN(Number(rawPid))
+              ? Number(rawPid)
+              : null;
+          return projectNumericId != null ? (
+            <button
+              type="button"
+              className={employeeProjectLinkTableClass}
+              onClick={() => setProjectModalId(projectNumericId)}
+              aria-label={`View project details: ${record.project}`}
+            >
+              {record.project}
+            </button>
+          ) : (
+            <span className="text-cs-text">{record.project}</span>
+          );
+        },
+      },
+      {
+        title: "Milestone",
+        dataIndex: "milestone",
+        key: "milestone",
+        align: "center",
+      },
+      {
+        title: "Expected End Date",
+        dataIndex: "expectedDate",
+        key: "expectedDate",
+        align: "center",
+        render: (value: string) => formatExpectedEndDate(value),
+      },
+      {
+        title: "Status",
+        key: "status",
+        align: "center",
+        render: (_, record) => (
+          <StatusBadge variant={getStatusVariant(record.status)}>
+            {record.status}
+          </StatusBadge>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const activeProjectNumericId = useMemo(() => {
+    const raw = activeTask?.projectId?.trim() ?? "";
+    if (raw === "" || Number.isNaN(Number(raw))) return null;
+    return Number(raw);
+  }, [activeTask?.projectId]);
   const isRunning = activeTask?.status === "In Progress";
 
   const handleStart = async () => {
@@ -212,9 +259,20 @@ export default function EmployeeDashboardPage() {
           <div className="flex flex-col gap-2 text-left">
             <p className="text-base text-cs-text">
               <span className="mr-1 font-medium text-cs-heading">Project:</span>
-              <span className="font-semibold">
-                {activeTask?.project ?? "No active task"}
-              </span>
+              {activeTask && activeProjectNumericId != null ? (
+                <button
+                  type="button"
+                  className={employeeProjectLinkClass}
+                  onClick={() => setProjectModalId(activeProjectNumericId)}
+                  aria-label={`View project details: ${activeTask.project}`}
+                >
+                  {activeTask.project}
+                </button>
+              ) : (
+                <span className="font-semibold">
+                  {activeTask?.project ?? "No active task"}
+                </span>
+              )}
             </p>
             <p className="text-base text-cs-text">
               <span className="mr-1 font-medium text-cs-heading">
@@ -326,6 +384,12 @@ export default function EmployeeDashboardPage() {
           </div>
         </div>
       </Card>
+
+      <ProjectDetailModal
+        open={projectModalId != null}
+        projectId={projectModalId}
+        onClose={() => setProjectModalId(null)}
+      />
     </div>
   );
 }

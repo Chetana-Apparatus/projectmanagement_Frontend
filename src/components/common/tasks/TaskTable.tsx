@@ -68,8 +68,7 @@ export default function TaskTable({
       Complete: "bg-green-100 text-green-700 ring-0 shadow-none",
       Running: "bg-blue-100 text-blue-700 ring-0 shadow-none",
       Paused: "bg-yellow-100 text-yellow-700 ring-0 shadow-none",
-      Stopped:
-        "border border-amber-400 bg-amber-50 text-amber-950 shadow-sm shadow-amber-200/50",
+      Stopped: "bg-red-100 text-red-700 ring-0 shadow-none",
       "Auto stop":
         "border border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm shadow-indigo-200/40",
       "Not Started": "bg-gray-100 text-gray-600 ring-0 shadow-none",

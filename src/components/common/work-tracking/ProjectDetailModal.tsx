@@ -1,20 +1,30 @@
 "use client";
 
 import { Modal, Table } from "antd";
+import { Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import type { ApiMilestone, ApiProject, ApiTask } from "@/lib/admin-mappers";
-import { getPublicApiOrigin } from "@/lib/api-base";
+import { useToast } from "@/components/common/toast/ToastProvider";
+import Button from "@/components/ui/Button";
+import type {
+  ApiMilestone,
+  ApiProject,
+  ApiProjectFile,
+  ApiTask,
+} from "@/lib/admin-mappers";
+import { fetchApiProject } from "@/lib/fetch-api-project";
+import { drfDelete, drfFormDataPatch, fetchAllPages } from "@/lib/pms-http";
 import {
-  apiFetch,
-  fetchWithAuth,
-  messageFromUnknownBody,
-} from "@/lib/api-client";
-import { fetchAllPages } from "@/lib/pms-http";
+  mergeProjectDocuments,
+  type ProjectFileRow,
+} from "@/lib/project-documents";
 
 type ProjectDetailModalProps = {
   open: boolean;
   projectId: number | null;
   onClose: () => void;
+  /** Admin / BA: allow DELETE on `/api/v1/files/` and clearing primary `document`. */
+  allowDeleteProjectFiles?: boolean;
+  onFilesMutated?: () => void;
 };
 
 function projectStatusLabel(status: string): string {
@@ -79,31 +89,6 @@ function renderStatusPill(label: string, status: string): ReactNode {
   );
 }
 
-async function loadProject(id: number): Promise<ApiProject> {
-  try {
-    const res = await apiFetch<ApiProject>(`/api/v1/projects/${id}/`, {
-      method: "GET",
-    });
-    if (res.success && res.data) return res.data;
-    throw new Error(res.message || "Failed to load project");
-  } catch (e) {
-    if (
-      e instanceof Error &&
-      e.message.includes("Unexpected API response shape")
-    ) {
-      const rawRes = await fetchWithAuth(`/api/v1/projects/${id}/`, {
-        method: "GET",
-      });
-      const rawBody = (await rawRes.json()) as unknown;
-      if (!rawRes.ok) {
-        throw new Error(messageFromUnknownBody(rawBody));
-      }
-      return rawBody as ApiProject;
-    }
-    throw e;
-  }
-}
-
 function truncateDesc(text: string | null | undefined): ReactNode {
   const s = (text ?? "").trim();
   if (!s) return <span className="text-gray-400">—</span>;
@@ -117,36 +102,21 @@ function truncateDesc(text: string | null | undefined): ReactNode {
   );
 }
 
-function documentHref(documentPath: string): string {
-  if (!documentPath) return "";
-  if (/^https?:\/\//i.test(documentPath)) return documentPath;
-  return `${getPublicApiOrigin() || "http://127.0.0.1:8000"}${documentPath}`;
-}
-
-type ProjectFileAttachment = {
-  id: number;
-  file: string;
-  project: number | null;
-};
-
-function docDisplayName(path: string | null | undefined): string {
-  if (!path) return "";
-  const normalized = path.split("?")[0];
-  const parts = normalized.split("/");
-  return parts[parts.length - 1] || path;
-}
-
 export default function ProjectDetailModal({
   open,
   projectId,
   onClose,
+  allowDeleteProjectFiles = false,
+  onFilesMutated,
 }: ProjectDetailModalProps) {
+  const { showToast } = useToast();
   const [project, setProject] = useState<ApiProject | null>(null);
-  const [attachments, setAttachments] = useState<ProjectFileAttachment[]>([]);
+  const [attachments, setAttachments] = useState<ApiProjectFile[]>([]);
   const [milestones, setMilestones] = useState<ApiMilestone[]>([]);
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || projectId == null) {
@@ -164,17 +134,15 @@ export default function ProjectDetailModal({
       setLoading(true);
       setError(null);
       try {
-        const [p, ms, ts, files] = await Promise.all([
-          loadProject(projectId),
+        const [p, ms, ts, allFiles] = await Promise.all([
+          fetchApiProject(projectId),
           fetchAllPages<ApiMilestone>("/api/v1/milestones/"),
           fetchAllPages<ApiTask>("/api/v1/tasks/"),
-          fetchAllPages<ProjectFileAttachment>(
-            `/api/v1/files/?project=${projectId}`,
-          ),
+          fetchAllPages<ApiProjectFile>("/api/v1/files/").catch(() => []),
         ]);
         if (cancelled) return;
         setProject(p);
-        setAttachments(files);
+        setAttachments(allFiles.filter((f) => Number(f.project) === projectId));
         setMilestones(ms.filter((m) => m.project === projectId));
         setTasks(ts.filter((t) => t.project === projectId));
       } catch (e) {
@@ -191,6 +159,52 @@ export default function ProjectDetailModal({
       cancelled = true;
     };
   }, [open, projectId]);
+
+  const fileRows = useMemo(
+    () => mergeProjectDocuments(project, attachments),
+    [project, attachments],
+  );
+
+  const refreshDocumentsOnly = async () => {
+    if (projectId == null) return;
+    try {
+      const [p, allFiles] = await Promise.all([
+        fetchApiProject(projectId),
+        fetchAllPages<ApiProjectFile>("/api/v1/files/").catch(() => []),
+      ]);
+      setProject(p);
+      setAttachments(allFiles.filter((f) => Number(f.project) === projectId));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Refresh failed", "error");
+    }
+  };
+
+  const removePrimaryDocument = async () => {
+    if (projectId == null) return;
+    const fd = new FormData();
+    fd.append("document", "");
+    await drfFormDataPatch(`/api/v1/projects/${projectId}/`, fd);
+  };
+
+  const handleDeleteFile = async (row: ProjectFileRow) => {
+    if (!allowDeleteProjectFiles || projectId == null) return;
+    setDeletingKey(row.key);
+    try {
+      if (row.source === "attachment" && row.attachmentId != null) {
+        await drfDelete(`/api/v1/files/${row.attachmentId}/`);
+        showToast("File removed", "success");
+      } else if (row.source === "primary") {
+        await removePrimaryDocument();
+        showToast("Document removed", "success");
+      }
+      await refreshDocumentsOnly();
+      onFilesMutated?.();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Delete failed", "error");
+    } finally {
+      setDeletingKey(null);
+    }
+  };
 
   const milestoneColumns = useMemo(
     () => [
@@ -273,11 +287,6 @@ export default function ProjectDetailModal({
     [],
   );
 
-  const totalDocCount =
-    project && typeof project.documents_count === "number"
-      ? project.documents_count
-      : (project?.document ? 1 : 0) + attachments.length;
-
   return (
     <Modal
       title={
@@ -344,38 +353,37 @@ export default function ProjectDetailModal({
 
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Files ({totalDocCount})
+              Files ({fileRows.length})
             </h3>
-            {totalDocCount === 0 ? (
-              <p className="text-sm text-gray-500">No files yet.</p>
+            {fileRows.length === 0 ? (
+              <p className="text-sm text-gray-500">No documents uploaded.</p>
             ) : (
-              <ul className="space-y-2 text-sm">
-                {project.document ? (
-                  <li className="rounded-md border border-gray-100 bg-gray-50/80 px-3 py-2">
-                    <a
-                      href={documentHref(project.document)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-sky-700 underline-offset-2 hover:underline"
-                    >
-                      {docDisplayName(project.document)}
-                    </a>
-                  </li>
-                ) : null}
-                {attachments.map((att) => (
+              <ul className="space-y-2">
+                {fileRows.map((row) => (
                   <li
-                    key={att.id}
-                    className="rounded-md border border-gray-100 bg-white px-3 py-2"
+                    key={row.key}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2"
                   >
                     <a
-                      href={documentHref(att.file)}
+                      href={row.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block min-w-0 truncate font-medium text-sky-700 underline-offset-2 hover:underline"
-                      title={docDisplayName(att.file)}
+                      className="min-w-0 flex-1 truncate font-normal text-sm text-sky-600 underline decoration-sky-500 underline-offset-2 hover:text-sky-700"
                     >
-                      {docDisplayName(att.file)}
+                      {row.displayName}
                     </a>
+                    {allowDeleteProjectFiles ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-8 shrink-0 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        disabled={deletingKey === row.key}
+                        onClick={() => handleDeleteFile(row)}
+                        aria-label={`Remove ${row.displayName}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
                   </li>
                 ))}
               </ul>

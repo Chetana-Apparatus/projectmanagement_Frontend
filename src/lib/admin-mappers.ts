@@ -249,6 +249,13 @@ export function userFormToPatchBody(values: {
 
 /** --- Projects --- */
 
+export type ApiProjectFile = {
+  id: number;
+  project: number;
+  /** Stored file URL or path from API serializer */
+  file: string;
+};
+
 export type ApiProject = {
   id: number;
   name: string;
@@ -262,7 +269,7 @@ export type ApiProject = {
   progress_percent?: number | null;
 };
 
-function fileNameFromPath(path: string | null | undefined): string {
+export function fileNameFromPath(path: string | null | undefined): string {
   if (!path) return "";
   const normalized = path.split("?")[0];
   const parts = normalized.split("/");

@@ -11,19 +11,35 @@ import {
   PlayCircle,
   StopCircle,
 } from "lucide-react";
-import { type CSSProperties, type ReactNode, Suspense, useState } from "react";
-import Card from "@/components/common/card/Card";
+import {
+  type CSSProperties,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import Button from "@/components/ui/Button";
 import { useEmployeeTasks } from "@/features/employee-tasks/EmployeeTasksProvider";
 import {
   type EmployeeManagedTask,
+  employeeProjectLinkTableClass,
+  fileNameFromPath,
   statusBadgeLayoutClass,
   statusClassMap,
+  toDocumentType,
 } from "@/features/employee-tasks/status";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
+import type { ApiProjectFile } from "@/lib/admin-mappers";
 import { getPublicApiOrigin } from "@/lib/api-base";
+import { fetchApiProject } from "@/lib/fetch-api-project";
+import { fetchAllPages } from "@/lib/pms-http";
+import {
+  mergeProjectDocuments,
+  type ProjectFileRow,
+} from "@/lib/project-documents";
+import { cn } from "@/lib/utils";
 
 const singleLineHeaderStyle: CSSProperties = { whiteSpace: "nowrap" };
 const singleLineCellStyle: CSSProperties = {
@@ -31,11 +47,72 @@ const singleLineCellStyle: CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
 };
+const MORE_MENU_STOP_ITEM_CLASS = "!text-red-800";
 
 function documentHref(documentPath: string): string {
   if (!documentPath) return "";
   if (/^https?:\/\//i.test(documentPath)) return documentPath;
   return `${getPublicApiOrigin() || "http://127.0.0.1:8000"}${documentPath}`;
+}
+
+function formatExpectedEndDate(value: string) {
+  if (!value || value === "-") return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString();
+}
+
+/** Primary project document plus `/api/v1/files/` rows for this project (same merge as admin). */
+async function fetchMergedProjectDocumentsForEmployee(
+  projectId: number,
+): Promise<ProjectFileRow[]> {
+  const [project, allFiles] = await Promise.all([
+    fetchApiProject(projectId),
+    fetchAllPages<ApiProjectFile>("/api/v1/files/").catch(() => []),
+  ]);
+  return mergeProjectDocuments(
+    project,
+    allFiles.filter((f) => Number(f.project) === projectId),
+  );
+}
+
+function mergeTaskAndProjectDocuments(
+  taskDocs: EmployeeManagedTask["documents"],
+  projectFiles: ProjectFileRow[],
+): EmployeeManagedTask["documents"] {
+  const byKey = new Map<string, EmployeeManagedTask["documents"][number]>();
+
+  const pushPath = (
+    pathOrUrl: string,
+    preferred?: EmployeeManagedTask["documents"][number],
+  ) => {
+    const trimmed = pathOrUrl.trim();
+    if (!trimmed) return;
+    const url = documentHref(trimmed);
+    const key = url.split("?")[0].toLowerCase();
+    if (byKey.has(key)) return;
+    byKey.set(
+      key,
+      preferred ?? {
+        name: fileNameFromPath(trimmed),
+        url,
+        type: toDocumentType(trimmed),
+      },
+    );
+  };
+
+  for (const d of taskDocs) {
+    pushPath(d.url, { ...d, url: documentHref(d.url) });
+  }
+  for (const pf of projectFiles) {
+    pushPath(pf.url, {
+      name: pf.displayName,
+      url: pf.url,
+      type: toDocumentType(pf.url),
+    });
+  }
+
+  return [...byKey.values()];
 }
 
 const isNearDeadline = (deadline: string) => {
@@ -85,9 +162,19 @@ function EmployeeTasksPageContent() {
   const [isSubmittingDeadlineRequest, setIsSubmittingDeadlineRequest] =
     useState(false);
   const [selectedProjectName, setSelectedProjectName] = useState("");
-  const [selectedDocuments, setSelectedDocuments] = useState<
+  const [docsModalProjectId, setDocsModalProjectId] = useState<number | null>(
+    null,
+  );
+  const [docsModalTaskDocs, setDocsModalTaskDocs] = useState<
     EmployeeManagedTask["documents"]
   >([]);
+  const [docsModalList, setDocsModalList] = useState<
+    EmployeeManagedTask["documents"]
+  >([]);
+  const [docsModalLoading, setDocsModalLoading] = useState(false);
+  const [docsModalFetchError, setDocsModalFetchError] = useState<string | null>(
+    null,
+  );
   const [deadlineTaskId, setDeadlineTaskId] = useState<string | null>(null);
   const [requestedDeadline, setRequestedDeadline] = useState("");
   const [deadlineReason, setDeadlineReason] = useState("");
@@ -101,9 +188,52 @@ function EmployeeTasksPageContent() {
 
   const openProjectDocuments = (task: EmployeeManagedTask) => {
     setSelectedProjectName(task.project);
-    setSelectedDocuments(task.documents);
+    const rawPid = task.projectId?.trim() ?? "";
+    const pid =
+      rawPid !== "" && !Number.isNaN(Number(rawPid)) ? Number(rawPid) : null;
+    setDocsModalProjectId(pid);
+    setDocsModalTaskDocs(task.documents);
+    setDocsModalFetchError(null);
+    setDocsModalList(mergeTaskAndProjectDocuments(task.documents, []));
+    setDocsModalLoading(pid != null);
     setIsDocsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!isDocsModalOpen || docsModalProjectId == null) {
+      if (!isDocsModalOpen) {
+        setDocsModalLoading(false);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    setDocsModalFetchError(null);
+
+    void (async () => {
+      try {
+        const projectFiles =
+          await fetchMergedProjectDocumentsForEmployee(docsModalProjectId);
+        if (cancelled) return;
+        setDocsModalList(
+          mergeTaskAndProjectDocuments(docsModalTaskDocs, projectFiles),
+        );
+      } catch (e) {
+        if (!cancelled) {
+          setDocsModalFetchError(
+            e instanceof Error ? e.message : "Could not load project documents",
+          );
+          setDocsModalList(mergeTaskAndProjectDocuments(docsModalTaskDocs, []));
+        }
+      } finally {
+        if (!cancelled) setDocsModalLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDocsModalOpen, docsModalProjectId, docsModalTaskDocs]);
 
   const handleDownload = (file: EmployeeManagedTask["documents"][number]) => {
     const anchor = document.createElement("a");
@@ -176,22 +306,29 @@ function EmployeeTasksPageContent() {
       align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
-      render: (_, record) =>
-        record.projectId ? (
-          <button
-            type="button"
-            className="max-w-full cursor-pointer text-left !text-blue-600 underline underline-offset-2 hover:!text-blue-800"
-            onClick={() => setProjectModalId(Number(record.projectId))}
-          >
-            <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
+      render: (_, record) => {
+        const rawPid = record.projectId?.trim() ?? "";
+        const projectNumericId =
+          rawPid !== "" && !Number.isNaN(Number(rawPid))
+            ? Number(rawPid)
+            : null;
+        return projectNumericId != null ? (
+          <div className="flex min-w-0 justify-center">
+            <button
+              type="button"
+              className={employeeProjectLinkTableClass}
+              onClick={() => setProjectModalId(projectNumericId)}
+              aria-label={`View project details: ${record.project}`}
+            >
               {record.project}
-            </span>
-          </button>
+            </button>
+          </div>
         ) : (
           <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-cs-text">
             {record.project}
           </span>
-        ),
+        );
+      },
     },
     {
       title: "Milestone",
@@ -247,6 +384,19 @@ function EmployeeTasksPageContent() {
           className={`${statusBadgeLayoutClass} max-w-full ${statusClassMap[record.status]}`}
         >
           {record.status}
+        </span>
+      ),
+    },
+    {
+      title: "Expected Deadline",
+      key: "expectedDate",
+      width: 140,
+      align: "center",
+      onHeaderCell: () => ({ style: singleLineHeaderStyle }),
+      onCell: () => ({ style: singleLineCellStyle }),
+      render: (_, record) => (
+        <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
+          {formatExpectedEndDate(record.deadline)}
         </span>
       ),
     },
@@ -316,8 +466,9 @@ function EmployeeTasksPageContent() {
                 "h-8 border border-red-300 bg-transparent px-3 text-xs text-red-600 hover:border-red-400 hover:text-red-700",
             };
           }
+          const resumeLabel = record.status === "Paused" ? "Resume" : "Start";
           return {
-            label: record.status === "Paused" ? "Resume" : "Start",
+            label: resumeLabel,
             icon: <PlayCircle className="size-4" />,
             onClick: () => startTask(record.id),
             disabled: disableAllActions || !canStart,
@@ -332,6 +483,7 @@ function EmployeeTasksPageContent() {
             label: string;
             icon: ReactNode;
             disabled: boolean;
+            className?: string;
             onClick: () => void;
           }[] = [];
 
@@ -361,16 +513,27 @@ function EmployeeTasksPageContent() {
               onClick: () => pauseTask(record.id),
             });
           }
-          if (
-            canComplete &&
-            record.status !== "In Progress" &&
-            record.status !== "Stopped"
-          ) {
+          if (canStop && record.status !== "In Progress") {
+            const stopDisabled = disableAllActions || !canStop;
+            items.push({
+              key: "stop",
+              label: "Stop",
+              icon: <StopCircle className="size-4 text-red-800" />,
+              disabled: stopDisabled,
+              className: cn(
+                MORE_MENU_STOP_ITEM_CLASS,
+                stopDisabled && "!opacity-50",
+              ),
+              onClick: () => handleStop(record.id),
+            });
+          }
+          if (canComplete && record.status !== "Stopped") {
+            const completeDisabled = disableAllActions || !canComplete;
             items.push({
               key: "complete",
               label: "Complete",
               icon: <Check className="size-4" />,
-              disabled: disableAllActions || !canComplete,
+              disabled: completeDisabled,
               onClick: () => handleComplete(record.id, record.status),
             });
           }
@@ -424,25 +587,26 @@ function EmployeeTasksPageContent() {
         <p className="p1 text-cs-text">Manage and track your assigned tasks</p>
       </div>
 
-      <Card className="items-start justify-start rounded-2xl shadow-sm">
-        <div className="w-full space-y-4">
-          {loading ? (
-            <p className="text-sm text-gray-500">Loading tasks…</p>
-          ) : null}
-          <Table<EmployeeManagedTask>
-            rowKey="id"
-            columns={columns}
-            dataSource={myTasks}
-            pagination={{ pageSize: 6 }}
-            scroll={{ x: 1200 }}
-            rowClassName={(record) =>
-              highlightRowId && record.id === highlightRowId
-                ? "!bg-sky-100/90 transition-colors duration-300"
-                : "hover:bg-gray-50/60"
-            }
-          />
-        </div>
-      </Card>
+      <div className="w-full overflow-hidden rounded-2xl border-1 border-gray-100 bg-white shadow-sm">
+        {loading ? (
+          <p className="px-4 py-3 text-sm text-gray-500 md:px-6">
+            Loading tasks…
+          </p>
+        ) : null}
+        <Table<EmployeeManagedTask>
+          className="w-full [&_.ant-table]:bg-white"
+          rowKey="id"
+          columns={columns}
+          dataSource={myTasks}
+          pagination={{ pageSize: 6 }}
+          scroll={{ x: 1280 }}
+          rowClassName={(record) =>
+            highlightRowId && record.id === highlightRowId
+              ? "!bg-sky-100/90 transition-colors duration-300"
+              : "hover:bg-gray-50/60"
+          }
+        />
+      </div>
 
       <ProjectDetailModal
         open={projectModalId != null}
@@ -453,7 +617,14 @@ function EmployeeTasksPageContent() {
       <Modal
         title="Project Files"
         open={isDocsModalOpen}
-        onCancel={() => setIsDocsModalOpen(false)}
+        onCancel={() => {
+          setIsDocsModalOpen(false);
+          setDocsModalProjectId(null);
+          setDocsModalTaskDocs([]);
+          setDocsModalList([]);
+          setDocsModalFetchError(null);
+          setDocsModalLoading(false);
+        }}
         footer={null}
       >
         <div className="space-y-3">
@@ -463,47 +634,52 @@ function EmployeeTasksPageContent() {
               : "No project selected"}
           </p>
 
-          {selectedDocuments.length > 0 ? (
-            <div className="space-y-2">
-              {selectedDocuments.map((document) => (
-                <div
-                  key={`${document.url}-${document.name}`}
+          {docsModalLoading ? (
+            <p className="text-sm text-gray-500">Loading project files…</p>
+          ) : null}
+
+          {docsModalFetchError ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {docsModalFetchError} Showing task attachments only.
+            </p>
+          ) : null}
+
+          {docsModalList.length > 0 ? (
+            <ul className="max-h-[min(360px,50vh)] space-y-2 overflow-y-auto pr-1">
+              {docsModalList.map((doc, idx) => (
+                <li
+                  key={`${doc.url}-${idx}`}
                   className="rounded-lg border border-cs-border px-3 py-2"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2">
                       <FileText className="size-4 shrink-0 text-cs-primary-100" />
                       <div className="min-w-0">
-                        <a
-                          href={documentHref(document.url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block truncate p1 font-medium text-sky-700 underline-offset-2 hover:underline"
-                        >
-                          {document.name}
-                        </a>
-                        <p className="p1 uppercase text-cs-text">
-                          {document.type}
+                        <p className="p1 truncate font-medium text-cs-heading">
+                          {doc.name || fileNameFromPath(doc.url)}
                         </p>
+                        <p className="p1 uppercase text-cs-text">{doc.type}</p>
                       </div>
                     </div>
                     <Button
                       variant="secondary"
                       className="h-8 shrink-0 px-3 text-xs"
-                      onClick={() => handleDownload(document)}
+                      onClick={() => handleDownload(doc)}
                     >
                       <Download className="size-4" />
                       Download
                     </Button>
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
-          ) : (
+            </ul>
+          ) : null}
+
+          {!docsModalLoading && docsModalList.length === 0 ? (
             <p className="rounded-lg border border-dashed border-cs-border p-3 p1 text-cs-text">
               No files available for this project yet.
             </p>
-          )}
+          ) : null}
         </div>
       </Modal>
 
