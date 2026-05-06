@@ -237,9 +237,9 @@ export default function ProjectTable({
   }, [previewProject, isMarkdown, absolutePreviewUrl]);
 
   const columns: DataTableColumn[] = [
-    { label: "Project", key: "name" },
+    { label: "Project Name", key: "name" },
     { label: "Start", key: "startDate" },
-    { label: "End", key: "expectedDate" },
+    { label: "Expected End Date", key: "expectedDate" },
     { label: "Files", key: "document" },
     { label: "Progress", key: "progress" },
     { label: "Status", key: "status" },
@@ -263,7 +263,7 @@ export default function ProjectTable({
                 }
                 setPreviewProject(row);
               }}
-              className="text-left text-sky-700 underline underline-offset-2 hover:text-sky-900"
+              className="text-left !text-blue-600 underline underline-offset-2 hover:!text-blue-800"
             >
               {row.name}
             </button>

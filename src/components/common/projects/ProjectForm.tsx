@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import {
   type ChangeEvent,
   type FormEvent,
@@ -305,10 +305,21 @@ export default function ProjectForm({
         className="flex min-h-0 flex-1 flex-col"
       >
         {/* HEADER */}
-        <div className="shrink-0 border-b border-gray-100 px-6 py-4 text-center">
-          <h2 className="text-xl font-semibold">
+        <div className="flex shrink-0 items-center border-b border-gray-100 px-6 py-4">
+          <div className="w-9 shrink-0" aria-hidden />
+          <h2 className="min-w-0 flex-1 text-center text-xl font-semibold">
             {initialValues ? "Edit Project" : "Add Project"}
           </h2>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            onClick={onCancel}
+            aria-label="Close project form"
+          >
+            <X size={16} />
+          </Button>
         </div>
 
         {/* SCROLLABLE BODY */}

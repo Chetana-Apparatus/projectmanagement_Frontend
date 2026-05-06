@@ -121,7 +121,7 @@ export default function TaskTable({
                 <button
                   type="button"
                   onClick={() => onOpenProject(row.project)}
-                  className="block max-w-full cursor-pointer truncate text-left text-sm  !text-sky-600 !underline decoration-sky-500 underline-offset-2 hover:!text-sky-700"
+                  className="block max-w-full cursor-pointer truncate text-left text-sm !text-blue-600 !underline underline-offset-2 hover:!text-blue-800"
                 >
                   {label}
                 </button>

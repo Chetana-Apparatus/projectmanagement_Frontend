@@ -24,7 +24,6 @@ import {
 } from "@/features/employee-tasks/status";
 import { useNotificationTableHighlight } from "@/hooks/useNotificationTableHighlight";
 import { getPublicApiOrigin } from "@/lib/api-base";
-import { clampProgress, formatProgressLabel } from "@/lib/progress-display";
 
 const singleLineHeaderStyle: CSSProperties = { whiteSpace: "nowrap" };
 const singleLineCellStyle: CSSProperties = {
@@ -181,7 +180,7 @@ function EmployeeTasksPageContent() {
         record.projectId ? (
           <button
             type="button"
-            className="max-w-full cursor-pointer text-left text-blue-600 hover:underline"
+            className="max-w-full cursor-pointer text-left !text-blue-600 underline underline-offset-2 hover:!text-blue-800"
             onClick={() => setProjectModalId(Number(record.projectId))}
           >
             <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
@@ -223,23 +222,18 @@ function EmployeeTasksPageContent() {
       ),
     },
     {
-      title: "Progress",
-      key: "progressPercent",
-      width: 90,
+      title: "Expected Date",
+      dataIndex: "deadline",
+      key: "expectedDate",
+      width: 150,
       align: "center",
       onHeaderCell: () => ({ style: singleLineHeaderStyle }),
       onCell: () => ({ style: singleLineCellStyle }),
-      render: (_, record) => {
-        const raw = clampProgress(record.progressPercent);
-        if (raw <= 0) {
-          return <span className="text-sm text-gray-500">—</span>;
-        }
-        return (
-          <span className="text-sm font-medium tabular-nums text-cs-text">
-            {formatProgressLabel(raw)}
-          </span>
-        );
-      },
+      render: (value: string) => (
+        <span className="text-sm tabular-nums text-cs-text">
+          {value || "-"}
+        </span>
+      ),
     },
     {
       title: "Status",
@@ -323,7 +317,7 @@ function EmployeeTasksPageContent() {
             };
           }
           return {
-            label: "Start",
+            label: record.status === "Paused" ? "Resume" : "Start",
             icon: <PlayCircle className="size-4" />,
             onClick: () => startTask(record.id),
             disabled: disableAllActions || !canStart,
@@ -349,13 +343,10 @@ function EmployeeTasksPageContent() {
             onClick: () => openProjectDocuments(record),
           });
 
-          if (canStart) {
+          if (canStart && record.status === "Stopped") {
             items.push({
               key: "start",
-              label:
-                record.status === "Paused" || record.status === "Stopped"
-                  ? "Resume"
-                  : "Start",
+              label: "Resume",
               icon: <PlayCircle className="size-4" />,
               disabled: disableAllActions || !canStart,
               onClick: () => startTask(record.id),
@@ -370,16 +361,11 @@ function EmployeeTasksPageContent() {
               onClick: () => pauseTask(record.id),
             });
           }
-          if (canStop) {
-            items.push({
-              key: "stop",
-              label: "Stop",
-              icon: <StopCircle className="size-4" />,
-              disabled: disableAllActions || !canStop,
-              onClick: () => handleStop(record.id),
-            });
-          }
-          if (canComplete) {
+          if (
+            canComplete &&
+            record.status !== "In Progress" &&
+            record.status !== "Stopped"
+          ) {
             items.push({
               key: "complete",
               label: "Complete",

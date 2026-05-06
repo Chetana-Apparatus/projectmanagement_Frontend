@@ -15,6 +15,7 @@ import DashboardCard from "@/components/common/dashboard/DashboardCard";
 import DataTable, {
   type DataTableColumn,
 } from "@/components/common/table/DataTable";
+import ProjectDetailModal from "@/components/common/work-tracking/ProjectDetailModal";
 import { statusBadgeLayoutClass } from "@/features/employee-tasks/status";
 import {
   type AdminDashboardPayload,
@@ -179,6 +180,7 @@ export default function AdminDashboardPage() {
   const [projectRows, setProjectRows] = useState<ProjectOverviewRow[]>([]);
   const [workTracking, setWorkTracking] = useState<WorkTrackingRow[]>([]);
   const [activityItems, setActivityItems] = useState<ActivityLogItem[]>([]);
+  const [projectModalId, setProjectModalId] = useState<number | null>(null);
   const [stats, setStats] = useState({
     projects: 0,
     inProgress: 0,
@@ -306,9 +308,13 @@ export default function AdminDashboardPage() {
           pageSize={5}
           renderers={{
             projectName: (row) => (
-              <span className="block text-center text-sm text-gray-800">
+              <button
+                type="button"
+                className="mx-auto block max-w-full cursor-pointer truncate text-center text-sm !text-blue-600 underline underline-offset-2 hover:!text-blue-800"
+                onClick={() => setProjectModalId(Number(row.id))}
+              >
                 {row.projectName}
-              </span>
+              </button>
             ),
             milestone: (row) => (
               <span className="block text-center text-sm text-gray-800">
@@ -390,6 +396,12 @@ export default function AdminDashboardPage() {
           <ActivityLog items={activityItems} />
         </div>
       </section>
+
+      <ProjectDetailModal
+        open={projectModalId != null}
+        projectId={projectModalId}
+        onClose={() => setProjectModalId(null)}
+      />
     </div>
   );
 }

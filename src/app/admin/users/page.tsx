@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/common/toast/ToastProvider";
 import UserForm, {
@@ -29,7 +29,11 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [nameFilter, setNameFilter] = useState("");
+  const [designationFilter, setDesignationFilter] = useState("");
+  const [developerTypeFilter, setDeveloperTypeFilter] = useState("");
   const [techStackFilter, setTechStackFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
 
   const loadUsers = useCallback(async () => {
     setLoadError(null);
@@ -74,14 +78,56 @@ export default function AdminUsersPage() {
     [users],
   );
 
+  const designationOptions = useMemo(
+    () =>
+      Array.from(new Set(users.map((user) => user.designation.trim())))
+        .filter((designation) => designation && designation !== "-")
+        .sort((a, b) => a.localeCompare(b)),
+    [users],
+  );
+
+  const developerTypeOptions = useMemo(
+    () =>
+      Array.from(new Set(users.map((user) => user.developerType.trim())))
+        .filter((developerType) => developerType && developerType !== "-")
+        .sort((a, b) => a.localeCompare(b)),
+    [users],
+  );
+
   const filteredUsers = useMemo(() => {
-    if (!techStackFilter) return users;
-    return users.filter((user) =>
-      user.techStack.some(
-        (stack) => stack.toLowerCase() === techStackFilter.toLowerCase(),
-      ),
-    );
-  }, [users, techStackFilter]);
+    const nameQuery = nameFilter.trim().toLowerCase();
+    return users.filter((user) => {
+      const fullName = `${user.firstName} ${user.lastName}`.trim();
+      if (nameQuery && !fullName.toLowerCase().includes(nameQuery)) {
+        return false;
+      }
+      if (designationFilter && user.designation !== designationFilter) {
+        return false;
+      }
+      if (developerTypeFilter && user.developerType !== developerTypeFilter) {
+        return false;
+      }
+      if (
+        techStackFilter &&
+        !user.techStack.some(
+          (stack) => stack.toLowerCase() === techStackFilter.toLowerCase(),
+        )
+      ) {
+        return false;
+      }
+      if (roleFilter && user.role !== roleFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [
+    users,
+    nameFilter,
+    designationFilter,
+    developerTypeFilter,
+    techStackFilter,
+    roleFilter,
+  ]);
 
   const closeForm = () => {
     setFormMode(null);
@@ -166,6 +212,36 @@ export default function AdminUsersPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-3">
         <div className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-x-auto py-0.5 sm:gap-x-3">
+          <input
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={nameFilter}
+            onChange={(e) => setNameFilter(e.target.value)}
+            placeholder="Filter by name"
+          />
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={designationFilter}
+            onChange={(e) => setDesignationFilter(e.target.value)}
+          >
+            <option value="">All designations</option>
+            {designationOptions.map((designation) => (
+              <option key={designation} value={designation}>
+                {designation}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={developerTypeFilter}
+            onChange={(e) => setDeveloperTypeFilter(e.target.value)}
+          >
+            <option value="">All developer types</option>
+            {developerTypeOptions.map((developerType) => (
+              <option key={developerType} value={developerType}>
+                {developerType}
+              </option>
+            ))}
+          </select>
           <select
             className="h-10 min-w-[12rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
             value={techStackFilter}
@@ -178,10 +254,26 @@ export default function AdminUsersPage() {
               </option>
             ))}
           </select>
+          <select
+            className="h-10 min-w-[10rem] rounded-md border border-cs-border bg-white px-3 text-sm text-cs-text"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+          >
+            <option value="">All roles</option>
+            <option value="Admin">Admin</option>
+            <option value="BA">BA</option>
+            <option value="Employee">Employee</option>
+          </select>
           <Button
             type="button"
             variant="secondary"
-            onClick={() => setTechStackFilter("")}
+            onClick={() => {
+              setNameFilter("");
+              setDesignationFilter("");
+              setDeveloperTypeFilter("");
+              setTechStackFilter("");
+              setRoleFilter("");
+            }}
           >
             Clear Filters
           </Button>
@@ -206,12 +298,6 @@ export default function AdminUsersPage() {
           />
 
           <div className="relative w-full max-w-xl">
-            <div className="mb-2 flex justify-end">
-              <Button variant="secondary" size="icon" onClick={closeForm}>
-                <X size={16} />
-              </Button>
-            </div>
-
             <UserForm
               key={formMode === "create" ? "create" : (editingUserId ?? "edit")}
               mode={formMode}

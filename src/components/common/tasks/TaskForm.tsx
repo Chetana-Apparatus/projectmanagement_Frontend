@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import Card from "@/components/common/card/Card";
 import type { Task } from "@/components/common/tasks/TaskTable";
@@ -210,10 +210,22 @@ export default function TaskForm({
           onSubmit(form);
         }}
       >
-        <div className="w-full text-center">
-          <p className="font-sans text-lg font-semibold text-gray-900">
+        <div className="flex w-full items-center">
+          <div className="w-9 shrink-0" aria-hidden />
+          <p className="min-w-0 flex-1 text-center font-sans text-lg font-semibold text-gray-900">
             {initial ? "Edit Task" : "Add Task"}
           </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            onClick={onCancel}
+            disabled={submitting}
+            aria-label="Close task form"
+          >
+            <X size={16} />
+          </Button>
         </div>
 
         <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
